@@ -4,6 +4,7 @@ namespace BrightCreations\MoneyConverter;
 
 use Brick\Money\CurrencyConverter;
 use Brick\Money\ExchangeRateProvider;
+use BrightCreations\MoneyConverter\Adapters\ExchangeRateServiceAdapter;
 use BrightCreations\MoneyConverter\Concretes\Builders\ExchangeRateConfigurableProviderBuilder;
 use BrightCreations\MoneyConverter\Concretes\Builders\ExchangeRatePDOProviderBuilder;
 use BrightCreations\MoneyConverter\Concretes\MoneyConverter;
@@ -74,7 +75,7 @@ class MoneyConverterServiceProvider extends ServiceProvider
         // Register ExchangeRateServiceInterface
         // This service will be used to fetch exchange rates when they are not found in the database
         $this->app->singleton(ExchangeRateServiceInterface::class, function () {
-            return $this->app->make(Config::get('money-converter.exchange_rates_service'));
+            return new ExchangeRateServiceAdapter($this->app->make(Config::get('money-converter.exchange_rates_service')));
         });
         // Register the MoneyConverter class
         // This is the class that will be used to convert currencies from outside the package

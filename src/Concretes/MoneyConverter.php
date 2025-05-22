@@ -9,8 +9,6 @@ use Brick\Money\Money;
 use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
 class MoneyConverter implements MoneyConverterInterface
