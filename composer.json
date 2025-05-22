@@ -23,7 +23,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "BrightCreations\\MoneyConverter\\ExchangeRatesServiceProvider"
+                "BrightCreations\\MoneyConverter\\MoneyConverterServiceProvider"
             ]
         }
     },
