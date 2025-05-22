@@ -1,5 +1,6 @@
 <?php
 
+use BrightCreations\ExchangeRates\Contracts\ExchangeRateServiceInterface;
 use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
 
 return [
@@ -13,6 +14,6 @@ return [
     // defaults
     'default_provider' => ExchangeRateProvidersEnum::PDO->value,
 
-    'exchange_rates_service' => "ExchangeRateServiceInterface", // the accessor for the exchange rate service
+    'exchange_rates_service' => ExchangeRateServiceInterface::class, // the accessor for the exchange rate service
 
 ];

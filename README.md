@@ -1,4 +1,5 @@
-# Exchange Rates Service Package
+## Money Converter Package
+A PHP package for converting money between different currencies.
 
 ![Downloads](https://img.shields.io/github/downloads/BrightCreations/money-converter/total)
 ![License](https://img.shields.io/github/license/BrightCreations/money-converter)
@@ -6,13 +7,14 @@
 ![Stars](https://img.shields.io/github/stars/BrightCreations/money-converter?style=social)
 
 ## Overview
-The Exchange Rates Service package provides a simple and efficient way to retrieve and manage exchange rates in your application. This package allows you to easily integrate exchange rate data into your project, making it ideal for e-commerce, financial, and other applications that require currency conversions.
+This package provides a simple and efficient way to convert money between different currencies. It uses a unified interface to fetch exchange rates and perform conversions, making it easy to integrate with various exchange rate services.
 
 ## Features
-- Retrieves exchange rates from a reliable data source
-- Caches exchange rates for improved performance
-- Provides a simple and intuitive API for accessing exchange rates
-- Supports multiple currencies and conversion scenarios
+- Converts money between different currencies
+- Uses a unified interface to fetch exchange rates and perform conversions
+- Supports multiple exchange rate services
+- Throws exceptions for invalid conversions or missing exchange rates
+- Easy to integrate with various frameworks and applications
 
 ## Installation
 To install the Exchange Rates Service package, run the following command in your terminal:
@@ -21,36 +23,26 @@ To install the Exchange Rates Service package, run the following command in your
 composer require brightcreations/money-converter
 ```
 
-## Migrations
-You can run the package migrations using the following command:
-
-```bash
-php artisan money-converter:migrate
-```
-
-## Configuration (Optional)
+## Configuration
 To configure the package, publish the configuration file using the following command:
 
 ```bash
-php artisan vendor:publish --provider="BrightCreations\MoneyConverter\ExchangeRatesServiceProvider"
-```
-
-Next, execute the migrations (if they haven't been executed yet):
-
-```bash
-php artisan migrate
+php artisan vendor:publish --provider="BrightCreations\MoneyConverter\MoneyConverterServiceProvider"
 ```
 
 Then, update the `money-converter.php` configuration file to suit your needs.
 
 ## Usage
-To retrieve exchange rates, use the `ExchangeRateServiceInterface`:
+To retrieve exchange rates, use the `MoneyConverterInterface`:
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
-// get exchange rates of USD with all other currencies as a laravel collection
-$exchangeRates = $service->getExchangeRates('USD');
+// Converts 100.00 USD to EUR using the current exchange rate
+$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
+
+// Converts 100.00 USD to EUR using the exchange rate of a previous date
+$convertedMinorInt = $service->convert(10000, 'USD', 'EUR', now()->subDays(1));
 ```
 
 You can inject the service into a constructor or resolve it using the `resolve` or `app->make` method. Here are examples of each approach:
@@ -58,18 +50,17 @@ You can inject the service into a constructor or resolve it using the `resolve` 
 ### Constructor Injection
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
 class SomeClass {
-    private $exchangeRateService;
+    private $service;
 
-    public function __construct(ExchangeRateServiceInterface $exchangeRateService) {
-        $this->exchangeRateService = $exchangeRateService;
+    public function __construct(MoneyConverterInterface $service) {
+        $this->service = $service;
     }
 
     public function someMethod() {
-        $exchangeRates = $this->exchangeRateService->getExchangeRates('USD');
-        // Use $exchangeRates...
+        $convertedMinorInt = $this->service->convert(10000, 'USD', 'EUR');
     }
 }
 ```
@@ -77,21 +68,19 @@ class SomeClass {
 ### Using `resolve` Method
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
-$exchangeRateService = resolve(ExchangeRateServiceInterface::class);
-$exchangeRates = $exchangeRateService->getExchangeRates('USD');
-// Use $exchangeRates...
+$service = resolve(MoneyConverterInterface::class);
+$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
 ```
 
 ### Using `app->make` Method
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
-$exchangeRateService = app()->make(ExchangeRateServiceInterface::class);
-$exchangeRates = $exchangeRateService->getExchangeRates('USD');
-// Use $exchangeRates...
+$service = app()->make(MoneyConverterInterface::class);
+$convertedMinorInt = $service->convert('USD');
 ```
 
 ## API Documentation
