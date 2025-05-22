@@ -45,6 +45,9 @@ $convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
 $convertedMinorInt = $service->convert(10000, 'USD', 'EUR', now()->subDays(1));
 ```
 
+> **Important Note:**
+> Before using the package, make sure that the tables of the exchange rates are in your database and the names of the tables and columns are reflected in the config as it is.
+
 You can inject the service into a constructor or resolve it using the `resolve` or `app->make` method. Here are examples of each approach:
 
 ### Constructor Injection
