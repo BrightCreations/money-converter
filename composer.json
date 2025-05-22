@@ -1,0 +1,38 @@
+{
+    "type": "library",
+    "name": "brightcreations/money-converter",
+    "description": "A Laravel package for converting currencies using exchange rates.",
+    "version": "v0.0.0",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Bright Creations",
+            "email": "kareem.shaaban@brightcreations.com"
+        }
+    ],
+    "keywords": [
+        "laravel",
+        "exchange rates",
+        "currency conversion"
+    ],
+    "autoload": {
+        "psr-4": {
+            "BrightCreations\\MoneyConverter\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "BrightCreations\\MoneyConverter\\ExchangeRatesServiceProvider"
+            ]
+        }
+    },
+    "require": {
+        "php": ">=8.1",
+        "illuminate/support": "^9.0|^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0 || ^11.0 || ^12.0",
+        "illuminate/http": "^10.0 || ^11.0 || ^12.0",
+        "illuminate/console": "^10.0 || ^11.0 || ^12.0",
+        "brick/money": "^0.8"
+    }
+}
