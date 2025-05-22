@@ -83,7 +83,7 @@ $convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
 $service = app()->make(MoneyConverterInterface::class);
-$convertedMinorInt = $service->convert('USD');
+$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
 ```
 
 ## API Documentation
