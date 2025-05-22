@@ -18,10 +18,10 @@ class ExchangeRatePDOProviderBuilder implements ExchangeRatePDOProviderBuilderIn
     public function build(): PDOProvider
     {
         $config = new PDOProviderConfiguration(
-            tableName:                  Config::get('exchange-rate.table'),
-            exchangeRateColumnName:     Config::get('exchange-rate.column'),
-            sourceCurrencyColumnName:   Config::get('exchange-rate.source_currency_column'),
-            targetCurrencyColumnName:   Config::get('exchange-rate.target_currency_column'),
+            tableName:                  Config::get('money-converter.exchange_rates.pdo.table'),
+            exchangeRateColumnName:     Config::get('money-converter.exchange_rates.pdo.column'),
+            sourceCurrencyColumnName:   Config::get('money-converter.exchange_rates.pdo.source_currency_column'),
+            targetCurrencyColumnName:   Config::get('money-converter.exchange_rates.pdo.target_currency_column'),
         );
 
         return new PDOProvider(DB::connection()->getPdo(), $config);
