@@ -34,6 +34,6 @@
         "illuminate/http": "^10.0 || ^11.0 || ^12.0",
         "illuminate/console": "^10.0 || ^11.0 || ^12.0",
         "brick/money": "^0.8",
-        "brightcreations/exchange-rates": "^0.0.0"
+        "brightcreations/exchange-rates": "*"
     }
 }
