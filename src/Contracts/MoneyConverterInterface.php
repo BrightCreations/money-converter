@@ -16,7 +16,7 @@ interface MoneyConverterInterface
      * @param int    $money            Amount of money in minor units (cents).
      * @param string $current_currency Source currency code.
      * @param string $target_currency  Target currency code.
-     * @param bool   $on_fail          Action to take if conversion fails; defaults to throwing an exception.
+     * @param int|null   $on_fail          Action to take if conversion fails; defaults to throwing an exception.
      *                                   Use ON_FAIL_THROW_EXCEPTION to throw an exception or
      *                                  ON_FAIL_FETCH_EXCHANGE_RATES to fetch exchange rates.
      * @param CarbonInterface|null $date_time Date and time for the conversion; defaults to now.
@@ -25,5 +25,5 @@ interface MoneyConverterInterface
      *
      * @throws MoneyConversionException conversion fails and on_fail is set to throw.
      */
-    public function convert($money, $current_currency, $target_currency, $date_time = null, $on_fail = null): int;
+    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int;
 }

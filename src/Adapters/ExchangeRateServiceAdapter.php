@@ -3,6 +3,8 @@
 namespace BrightCreations\MoneyConverter\Adapters;
 
 use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 class ExchangeRateServiceAdapter implements ExchangeRateServiceInterface
 {
@@ -14,12 +16,12 @@ class ExchangeRateServiceAdapter implements ExchangeRateServiceInterface
         private $exchangeRateService
     ) { }
 
-    public function storeExchangeRates($currency_code)
+    public function storeExchangeRates(string $currency_code): Collection
     {
         return $this->exchangeRateService->storeExchangeRates($currency_code);
     }
 
-    public function getHistoricalExchangeRate($current_currency, $target_currency, $date)
+    public function getHistoricalExchangeRate(string $current_currency, string $target_currency, CarbonInterface $date): object
     {
         return $this->exchangeRateService->getHistoricalExchangeRate($current_currency, $target_currency, $date);
     }
