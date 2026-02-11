@@ -2,7 +2,7 @@
     "type": "library",
     "name": "brightcreations/money-converter",
     "description": "A Laravel package for converting currencies using exchange rates.",
-    "version": "v0.3.1",
+    "version": "v0.4.0",
     "license": "MIT",
     "authors": [
         {
