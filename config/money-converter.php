@@ -18,6 +18,6 @@ return [
     // defaults
     'default_provider' => ExchangeRateProvidersEnum::PDO->value,
 
-    'exchange_rates_service' => ExchangeRateServiceInterface::class, // the accessor for the exchange rate service
+    'extrapolate_currency_code' => 'USD',
 
 ];

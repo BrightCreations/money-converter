@@ -6,49 +6,123 @@ use Brick\Math\RoundingMode;
 use Brick\Money\CurrencyConverter;
 use Brick\Money\Exception\CurrencyConversionException;
 use Brick\Money\Money;
-use BrightCreations\MoneyConverter\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\ExchangeRates\Facades\ExchangeRate;
+use BrightCreations\ExchangeRates\Facades\ExchangeRateRepository;
+use BrightCreations\ExchangeRates\Facades\HistoricalExchangeRate;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
-class MoneyConverter implements MoneyConverterInterface
+final class MoneyConverter implements MoneyConverterInterface
 {
-    public const LOG_PREFIX = '[MoneyConverter]';
+    private const LOG_PREFIX = '[MoneyConverter]';
+
+    private bool $extrapolate;
+    private bool $needs_fresh;
+    private int $on_fail;
 
     public function __construct(
-        private readonly ExchangeRateServiceInterface $exchangeRateService,
         private readonly CurrencyConverter $converter
-    ) { }
+    ) {
+        $this->extrapolate = false;
+        $this->needs_fresh = false;
+        $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
+    }
+
+    public function extrapolate(bool $extrapolate = true): static
+    {
+        $this->extrapolate = $extrapolate;
+        return $this;
+    }
+
+    public function needsFresh(bool $needs_fresh = true): static
+    {
+        $this->needs_fresh = $needs_fresh;
+        return $this;
+    }
+
+    public function throwOnFail(): static
+    {
+        $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
+        return $this;
+    }
+
+    public function fetchOnFail(): static
+    {
+        $this->on_fail = static::ON_FAIL_FETCH_EXCHANGE_RATES;
+        return $this;
+    }
+
+    public function isFetchOnFail(): bool
+    {
+        return $this->on_fail === static::ON_FAIL_FETCH_EXCHANGE_RATES;
+    }
+
+    public function isThrowOnFail(): bool
+    {
+        return $this->on_fail === static::ON_FAIL_THROW_EXCEPTION;
+    }
 
     public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int {
-        $on_fail ??= static::ON_FAIL_THROW_EXCEPTION;
+        if ($on_fail !== null) {
+            match ($on_fail) {
+                static::ON_FAIL_FETCH_EXCHANGE_RATES => $this->fetchOnFail(),
+                static::ON_FAIL_THROW_EXCEPTION => $this->throwOnFail(),
+                default => throw new \InvalidArgumentException(self::LOG_PREFIX . ' Invalid on fail value: ' . $on_fail . '. Expected: ' . static::ON_FAIL_FETCH_EXCHANGE_RATES . ' for fetching exchange rates' . ' or ' . static::ON_FAIL_THROW_EXCEPTION . ' for throwing an exception. Got: ' . $on_fail),
+            };
+        }
+
+        if ($date_time) {
+            return $this->convertHistorical($money, $current_currency, $target_currency, $date_time);
+        }
+
+        if ($this->needs_fresh) {
+            return $this->convertFresh($money, $current_currency, $target_currency);
+        }
+
+        return $this->convertCurrent($money, $current_currency, $target_currency);
+    }
+
+    public function convertCurrent(int $money, string $current_currency, string $target_currency): int
+    {
         $money = Money::ofMinor($money, $current_currency);
         try {
-            if ($date_time) {
-                try {
-                    return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
-                } catch (\Throwable $th) {
-                    $this->logError($th, func_get_args());
-                    throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using historical exchange rates: " . $th->getMessage(), $th);
-                }
+            return $this->getConvertedMoney($money, $target_currency);
+        } catch (CurrencyConversionException $e) {
+            if ($this->isFetchOnFail()) {
+                return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
             }
-            try {
-                return $this->getConvertedMoney($money, $target_currency);
-            } catch (CurrencyConversionException $e) {
-                if ($on_fail === static::ON_FAIL_FETCH_EXCHANGE_RATES) {
-                    return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
-                }
 
-                $this->logError($e, func_get_args());
-                throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $e->getMessage(), $e);
-            } catch (\Throwable $th) {
-                $this->logError($th, func_get_args());
-                throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
-            }
+            $this->logError($e, func_get_args());
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $e->getMessage(), $e);
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args());
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
+        }
+    }
+
+    public function convertFresh(int $money, string $current_currency, string $target_currency): int
+    {
+        $money = Money::ofMinor($money, $current_currency);
+        try {
+            return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
+        } catch (\Throwable $th) {
+            $this->logError($th, func_get_args());
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
+        }
+    }
+
+    public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time): int
+    {
+        $money = Money::ofMinor($money, $current_currency);
+        try {
+            return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
+        } catch (\Throwable $th) {
+            $this->logError($th, func_get_args());
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using historical exchange rates: " . $th->getMessage(), $th);
         }
     }
 
@@ -65,28 +139,50 @@ class MoneyConverter implements MoneyConverterInterface
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
         // Fetch base currency exchange rates
-        $this->exchangeRateService->storeExchangeRates($current_currency);
+        ExchangeRate::storeExchangeRates($current_currency);
         // Fetch target currency exchange rates
-        $this->exchangeRateService->storeExchangeRates($target_currency);
+        ExchangeRate::storeExchangeRates($target_currency);
         // Convert
         return $this->getConvertedMoney($money, $target_currency, $rounding_mode);
     }
 
     private function getConvertedMoneyUsingHistoricalExchangeRates(Money $money, $target_currency, $date_time, $rounding_mode = RoundingMode::Down): int
     {
-        if (! $this->exchangeRateService->isSupportHistoricalExchangeRate()) {
+        if (! ExchangeRate::isSupportHistoricalExchangeRate()) {
             Log::error(self::LOG_PREFIX . ' Historical exchange rate is not supported for the exchange rate service');
-            Log::error(self::LOG_PREFIX . ' Exchange rate service: ' . get_class($this->exchangeRateService));
             throw new MoneyConversionException(self::LOG_PREFIX . " Historical exchange rate is not supported for the exchange rate service");
         }
         $current_currency = $money->getCurrency()->getCurrencyCode();
-        // Fetch base currency exchange rates
-        $historicalExchangeRate = $this->exchangeRateService->getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
 
-        // Convert
-        return $money->multipliedBy($historicalExchangeRate->exchange_rate, $rounding_mode)
-            ->getMinorAmount()
-            ->toInt();
+        if (!$this->extrapolate) {
+            // Fetch base currency exchange rates
+            // Hit the API to get the historical exchange rate if not found in the database
+            $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
+    
+            // Convert
+            return $money->multipliedBy($historicalExchangeRate->exchange_rate, $rounding_mode)
+                ->getMinorAmount()
+                ->toInt();
+        }
+
+        try {
+            // Try query historical exchange rate from database
+            $historical_exchange_rate = ExchangeRateRepository::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
+            return $money->multipliedBy($historical_exchange_rate->exchange_rate, $rounding_mode)
+                ->getMinorAmount()
+                ->toInt();
+        } catch (ModelNotFoundException $e) {
+            // Try extrapolate with proxy currency
+            $proxy_currency = Config::get('money-converter.extrapolate_currency_code', 'USD');
+
+            $proxy_currency_exchange_rates = ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
+            $proxy_target_rate = $proxy_currency_exchange_rates->where('target_currency_code', $target_currency)->firstOrFail();
+            $proxy_current_rate = $proxy_currency_exchange_rates->where('target_currency_code', $current_currency)->firstOrFail();
+            $current_target_rate = $proxy_target_rate->exchange_rate / $proxy_current_rate->exchange_rate;
+            return $money->multipliedBy($current_target_rate, $rounding_mode)
+                ->getMinorAmount()
+                ->toInt();
+        }
     }
 
     private function logError(\Throwable $th, array $func_args): void
