@@ -19,6 +19,14 @@ interface MoneyConverterInterface
     public function extrapolate(bool $extrapolate = true): static;
 
     /**
+     * Fetch the exchange rates on each conversion.
+     *
+     * @param bool $needs_fresh Whether to fetch the exchange rates on each conversion.
+     * @return static
+     */
+    public function needsFresh(bool $needs_fresh = true): static;
+
+    /**
      * Throw an exception if the conversion fails.
      *
      * @return static

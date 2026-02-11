@@ -7,11 +7,12 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static MoneyConverterInterface extrapolate(bool $extrapolate = true)
+ * @method static MoneyConverterInterface needsFresh(bool $needs_fresh = true)
  * @method static MoneyConverterInterface throwOnFail()
  * @method static MoneyConverterInterface fetchOnFail()
  * @method static bool isFetchOnFail()
  * @method static bool isThrowOnFail()
- * @method static int convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null)
+ * @method static int convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null)
  * @method static int convertCurrent(int $money, string $current_currency, string $target_currency)
  * @method static int convertFresh(int $money, string $current_currency, string $target_currency)
  * @method static int convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time)
