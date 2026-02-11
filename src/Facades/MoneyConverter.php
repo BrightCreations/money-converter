@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static int convertCurrent(int $money, string $current_currency, string $target_currency)
  * @method static int convertFresh(int $money, string $current_currency, string $target_currency)
  * @method static int convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time)
+ * @method static int convertToday(int $money, string $current_currency, string $target_currency)
  */
 class MoneyConverter extends Facade
 {

@@ -104,4 +104,15 @@ interface MoneyConverterInterface
      * @return int Converted amount of money in minor units (cents).
      */
     public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time): int;
+
+    /**
+     * Converts a given amount of money from one currency to another using the today's exchange rate.
+     *
+     * @param int    $money            Amount of money in minor units (cents).
+     * @param string $current_currency Source currency code.
+     * @param string $target_currency  Target currency code.
+     *
+     * @return int Converted amount of money in minor units (cents).
+     */
+    public function convertToday(int $money, string $current_currency, string $target_currency): int;
 }

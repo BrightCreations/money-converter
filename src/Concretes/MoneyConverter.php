@@ -11,6 +11,7 @@ use BrightCreations\ExchangeRates\Facades\ExchangeRateRepository;
 use BrightCreations\ExchangeRates\Facades\HistoricalExchangeRate;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Config;
@@ -123,6 +124,17 @@ final class MoneyConverter implements MoneyConverterInterface
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args());
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using historical exchange rates: " . $th->getMessage(), $th);
+        }
+    }
+
+    public function convertToday(int $money, string $current_currency, string $target_currency): int
+    {
+        $money = Money::ofMinor($money, $current_currency);
+        try {
+            return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, Carbon::now()->startOfDay());
+        } catch (\Throwable $th) {
+            $this->logError($th, func_get_args());
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using today's exchange rates: " . $th->getMessage(), $th);
         }
     }
 
