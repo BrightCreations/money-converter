@@ -2,6 +2,7 @@
 
 namespace BrightCreations\MoneyConverter\Concretes;
 
+use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Brick\Money\CurrencyConverter;
 use Brick\Money\Exception\CurrencyConversionException;
@@ -190,9 +191,11 @@ final class MoneyConverter implements MoneyConverterInterface
             // Fetch base currency exchange rates
             // Hit the API to get the historical exchange rate if not found in the database
             $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-    
+            Log::info(self::LOG_PREFIX . ' non-extrapolated exchange rate', ['ex' => $historicalExchangeRate]);
+            $exchange_rate = BigDecimal::of($historicalExchangeRate->exchange_rate);
+
             // Convert
-            return $money->multipliedBy($historicalExchangeRate->exchange_rate, $rounding_mode)
+            return $money->multipliedBy($exchange_rate, $rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         }
@@ -200,7 +203,9 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             // Try query historical exchange rate from database
             $historical_exchange_rate = ExchangeRateRepository::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-            return $money->multipliedBy($historical_exchange_rate->exchange_rate, $rounding_mode)
+            $exchange_rate = BigDecimal::of($historical_exchange_rate->exchange_rate);
+
+            return $money->multipliedBy($exchange_rate, $rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         } catch (ModelNotFoundException $e) {
@@ -210,7 +215,11 @@ final class MoneyConverter implements MoneyConverterInterface
             $proxy_currency_exchange_rates = ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
             $proxy_target_rate = $proxy_currency_exchange_rates->where('target_currency_code', $target_currency)->firstOrFail();
             $proxy_current_rate = $proxy_currency_exchange_rates->where('target_currency_code', $current_currency)->firstOrFail();
-            $current_target_rate = $proxy_target_rate->exchange_rate / $proxy_current_rate->exchange_rate;
+            $decimals = [
+                'proxy_target_rate' => BigDecimal::of($proxy_target_rate->exchange_rate),
+                'proxy_current_rate' => BigDecimal::of($proxy_current_rate->exchange_rate),
+            ];
+            $current_target_rate = $decimals['proxy_target_rate']->dividedBy($decimals['proxy_current_rate']);
             return $money->multipliedBy($current_target_rate, $rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
