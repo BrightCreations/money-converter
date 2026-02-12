@@ -237,13 +237,11 @@ final class MoneyConverter implements MoneyConverterInterface
      *
      * @param mixed $rate
      */
-    private function normalizeRate(mixed $rate): string
+    private function normalizeRate(mixed $rate): BigDecimal
     {
-        $decimal = $rate instanceof BigDecimal
+        return $rate instanceof BigDecimal
             ? $rate
             : BigDecimal::of((string) $rate);
-
-        return (string) $decimal->toScale(8, $this->rounding_mode);
     }
 
     private function logError(\Throwable $th, array $func_args, string $method_name): void
