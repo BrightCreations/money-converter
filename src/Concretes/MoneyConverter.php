@@ -105,10 +105,10 @@ final class MoneyConverter implements MoneyConverterInterface
                 return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
             }
 
-            $this->logError($e, func_get_args());
+            $this->logError($e, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $e->getMessage(), $e);
         } catch (\Throwable $th) {
-            $this->logError($th, func_get_args());
+            $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
         }
     }
@@ -123,7 +123,7 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
         } catch (\Throwable $th) {
-            $this->logError($th, func_get_args());
+            $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
         }
     }
@@ -138,7 +138,7 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
         } catch (\Throwable $th) {
-            $this->logError($th, func_get_args());
+            $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using historical exchange rates: " . $th->getMessage(), $th);
         }
     }
@@ -153,7 +153,7 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, Carbon::now()->startOfDay());
         } catch (\Throwable $th) {
-            $this->logError($th, func_get_args());
+            $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using today's exchange rates: " . $th->getMessage(), $th);
         }
     }
@@ -217,9 +217,9 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    private function logError(\Throwable $th, array $func_args): void
+    private function logError(\Throwable $th, array $func_args, string $method_name): void
     {
-        Log::error(self::LOG_PREFIX . ' Error: ' . $th->getMessage());
+        Log::error(self::LOG_PREFIX . ' Error: ' . $th->getMessage() . ' in ' . $th->getFile() . ' on line ' . $th->getLine() . ' in method ' . $method_name);
         Log::error(self::LOG_PREFIX . ' Method args: ' . json_encode($func_args));
         Log::error(self::LOG_PREFIX . ' Exception class: ' . get_class($th));
         Log::debug(self::LOG_PREFIX . ' Trace: ' . $th->getTraceAsString());
