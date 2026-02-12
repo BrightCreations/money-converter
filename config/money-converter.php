@@ -1,7 +1,7 @@
 <?php
 
-use BrightCreations\ExchangeRates\Contracts\ExchangeRateServiceInterface;
 use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
+use Brick\Math\RoundingMode;
 
 return [
 
@@ -19,5 +19,20 @@ return [
     'default_provider' => ExchangeRateProvidersEnum::PDO->value,
 
     'extrapolate_currency_code' => 'USD',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rounding mode for currency conversion
+    |--------------------------------------------------------------------------
+    |
+    | This controls how Brick\Money will round values when the result of a
+    | conversion has more decimal places than the currency scale allows.
+    | The default is to round down (truncate) which favors the payer.
+    |
+    | Available modes: RoundingMode::UP, ::DOWN, ::CEILING, ::FLOOR,
+    | ::HALF_UP, ::HALF_DOWN, ::HALF_EVEN, ::UNNECESSARY
+    |
+    */
+    'rounding_mode' => RoundingMode::Down,
 
 ];

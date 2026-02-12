@@ -25,6 +25,7 @@ final class MoneyConverter implements MoneyConverterInterface
     private bool $extrapolate;
     private bool $needs_fresh;
     private int $on_fail;
+    private RoundingMode $rounding_mode;
 
     public function __construct(
         private readonly CurrencyConverter $converter
@@ -32,6 +33,7 @@ final class MoneyConverter implements MoneyConverterInterface
         $this->extrapolate = false;
         $this->needs_fresh = false;
         $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
+        $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::Down);
     }
 
     public function extrapolate(bool $extrapolate = true): static
@@ -159,16 +161,16 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    private function getConvertedMoney($money, $target_currency, $rounding_mode = RoundingMode::Down): int
+    private function getConvertedMoney($money, $target_currency): int
     {
         return $this->converter->convert(
             moneyContainer: $money,
             currency: $target_currency,
-            roundingMode: $rounding_mode
+            roundingMode: $this->rounding_mode
         )->getMinorAmount()->toInt();
     }
 
-    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, $target_currency, $rounding_mode = RoundingMode::Down): int
+    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, $target_currency): int
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
         // Fetch base currency exchange rates
@@ -176,10 +178,10 @@ final class MoneyConverter implements MoneyConverterInterface
         // Fetch target currency exchange rates
         ExchangeRate::storeExchangeRates($target_currency);
         // Convert
-        return $this->getConvertedMoney($money, $target_currency, $rounding_mode);
+        return $this->getConvertedMoney($money, $target_currency);
     }
 
-    private function getConvertedMoneyUsingHistoricalExchangeRates(Money $money, $target_currency, $date_time, $rounding_mode = RoundingMode::Down): int
+    private function getConvertedMoneyUsingHistoricalExchangeRates(Money $money, $target_currency, $date_time): int
     {
         if (! ExchangeRate::isSupportHistoricalExchangeRate()) {
             Log::error(self::LOG_PREFIX . ' Historical exchange rate is not supported for the exchange rate service');
@@ -191,11 +193,9 @@ final class MoneyConverter implements MoneyConverterInterface
             // Fetch base currency exchange rates
             // Hit the API to get the historical exchange rate if not found in the database
             $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-            Log::info(self::LOG_PREFIX . ' non-extrapolated exchange rate', ['ex' => $historicalExchangeRate]);
-            $exchange_rate = BigDecimal::of($historicalExchangeRate->exchange_rate);
+            $normalizedRate = $this->normalizeRate($historicalExchangeRate->exchange_rate);
 
-            // Convert
-            return $money->multipliedBy($exchange_rate, $rounding_mode)
+            return $money->multipliedBy($normalizedRate, $this->rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         }
@@ -203,9 +203,9 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             // Try query historical exchange rate from database
             $historical_exchange_rate = ExchangeRateRepository::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-            $exchange_rate = BigDecimal::of($historical_exchange_rate->exchange_rate);
+            $normalizedRate = $this->normalizeRate($historical_exchange_rate->exchange_rate);
 
-            return $money->multipliedBy($exchange_rate, $rounding_mode)
+            return $money->multipliedBy($normalizedRate, $this->rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         } catch (ModelNotFoundException $e) {
@@ -215,15 +215,35 @@ final class MoneyConverter implements MoneyConverterInterface
             $proxy_currency_exchange_rates = ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
             $proxy_target_rate = $proxy_currency_exchange_rates->where('target_currency_code', $target_currency)->firstOrFail();
             $proxy_current_rate = $proxy_currency_exchange_rates->where('target_currency_code', $current_currency)->firstOrFail();
-            $decimals = [
-                'proxy_target_rate' => BigDecimal::of($proxy_target_rate->exchange_rate),
-                'proxy_current_rate' => BigDecimal::of($proxy_current_rate->exchange_rate),
-            ];
-            $current_target_rate = $decimals['proxy_target_rate']->dividedBy($decimals['proxy_current_rate']);
-            return $money->multipliedBy($current_target_rate, $rounding_mode)
+
+            $proxyTarget = BigDecimal::of($proxy_target_rate->exchange_rate);
+            $proxyCurrent = BigDecimal::of($proxy_current_rate->exchange_rate);
+            $current_target_rate = $proxyTarget->dividedBy(
+                $proxyCurrent,
+                8,
+                $this->rounding_mode
+            );
+
+            $normalizedRate = $this->normalizeRate($current_target_rate);
+
+            return $money->multipliedBy($normalizedRate, $this->rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         }
+    }
+
+    /**
+     * Normalize an exchange rate to a fixed scale using the configured rounding mode.
+     *
+     * @param mixed $rate
+     */
+    private function normalizeRate(mixed $rate): string
+    {
+        $decimal = $rate instanceof BigDecimal
+            ? $rate
+            : BigDecimal::of((string) $rate);
+
+        return (string) $decimal->toScale(8, $this->rounding_mode);
     }
 
     private function logError(\Throwable $th, array $func_args, string $method_name): void
