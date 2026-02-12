@@ -18,7 +18,7 @@ return [
     // defaults
     'default_provider' => ExchangeRateProvidersEnum::PDO->value,
 
-    'extrapolate_currency_code' => 'USD',
+    'proxy_currency_code' => 'USD',
 
     /*
     |--------------------------------------------------------------------------
