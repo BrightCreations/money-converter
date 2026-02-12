@@ -68,6 +68,10 @@ final class MoneyConverter implements MoneyConverterInterface
     }
 
     public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int {
+        if ($current_currency === $target_currency) {
+            return $money;
+        }
+
         if ($on_fail !== null) {
             match ($on_fail) {
                 static::ON_FAIL_FETCH_EXCHANGE_RATES => $this->fetchOnFail(),
@@ -89,6 +93,10 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertCurrent(int $money, string $current_currency, string $target_currency): int
     {
+        if ($current_currency === $target_currency) {
+            return $money;
+        }
+
         $money = Money::ofMinor($money, $current_currency);
         try {
             return $this->getConvertedMoney($money, $target_currency);
@@ -107,6 +115,10 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertFresh(int $money, string $current_currency, string $target_currency): int
     {
+        if ($current_currency === $target_currency) {
+            return $money;
+        }
+
         $money = Money::ofMinor($money, $current_currency);
         try {
             return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
@@ -118,6 +130,10 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time): int
     {
+        if ($current_currency === $target_currency) {
+            return $money;
+        }
+
         $money = Money::ofMinor($money, $current_currency);
         try {
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
@@ -129,6 +145,10 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertToday(int $money, string $current_currency, string $target_currency): int
     {
+        if ($current_currency === $target_currency) {
+            return $money;
+        }
+
         $money = Money::ofMinor($money, $current_currency);
         try {
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, Carbon::now()->startOfDay());
