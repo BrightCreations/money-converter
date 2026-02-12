@@ -33,7 +33,7 @@ final class MoneyConverter implements MoneyConverterInterface
         $this->extrapolate = false;
         $this->needs_fresh = false;
         $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
-        $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::DOWN);
+        $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::Down);
     }
 
     public function extrapolate(bool $extrapolate = true): static
