@@ -9,7 +9,7 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 ### Changed
 
 - Pin `brightcreations/exchange-rates` to `^0.8.0` (requires bounding-rate repository methods for interpolation).
-- Add explicit `brick/math` dependency (`^0.10.2`) for historical conversion math.
+- Add explicit `brick/math` dependency (`^0.12.0`) for historical conversion math.
 
 ### Fixed
 
