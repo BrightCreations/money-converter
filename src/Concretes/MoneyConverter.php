@@ -120,7 +120,7 @@ final class MoneyConverter implements MoneyConverterInterface
             throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $e->getMessage(), $e);
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $th->getMessage(), $th);
         }
     }
 

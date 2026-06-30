@@ -257,9 +257,9 @@ Phases 1–3 can ship as **money-converter v0.6.0** with **exchange-rates v0.8.2
 
 The following items from this plan should be tracked in **exchange-rates** (copy or link `docs/ENHANCEMENT_PLAN.md` section “exchange-rates tasks”):
 
-- [ ] 1.6 — Facade `@method` for bounding rates
-- [ ] 1.7 — `docs/repository.md` bounding section
-- [ ] 1.8 — Bounding repository tests
+- [x] 1.6 — Facade `@method` for bounding rates
+- [x] 1.7 — `docs/repository.md` bounding section
+- [x] 1.8 — Bounding repository tests
 - [ ] 2.6 — Provider historical capability table
 - [ ] 2.7 — Optional nearest-rate helper (if needed)
 - [ ] 3.8 — “Consuming with money-converter” README section
@@ -278,6 +278,7 @@ Record choices here as work proceeds.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-06-30 | Phase 1 complete | exchange-rates v0.8.2 (facade, docs, tests); money-converter 0.5.2 (pin ER ^0.8.0, brick/math, dead code removal, error fix, CHANGELOG) |
 | 2026-06-30 | money-converter owns interpolation/extrapolation | exchange-rates is data layer; keeps user API in one package |
 | 2026-06-30 | Pin exchange-rates `^0.8.0` | `getBoundingHistoricalRates` required for interpolation |
 | | Extrapolation strategy TBD | nearest-neighbour vs linear — pick during Phase 2 implementation |
