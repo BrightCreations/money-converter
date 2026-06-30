@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static MoneyConverterInterface extrapolate(bool $extrapolate = true)
+ * @method static MoneyConverterInterface interpolate(bool $interpolate = true)
  * @method static MoneyConverterInterface needsFresh(bool $needs_fresh = true)
  * @method static MoneyConverterInterface throwOnFail()
  * @method static MoneyConverterInterface fetchOnFail()

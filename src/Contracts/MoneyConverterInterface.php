@@ -19,6 +19,14 @@ interface MoneyConverterInterface
     public function extrapolate(bool $extrapolate = true): static;
 
     /**
+     * Interpolate the conversion if the exchange rate is not found.
+     *
+     * @param bool $interpolate Whether to interpolate the conversion if the exchange rate is not found.
+     * @return static
+     */
+    public function interpolate(bool $interpolate = true): static;
+
+    /**
      * Fetch the exchange rates on each conversion.
      *
      * @param bool $needs_fresh Whether to fetch the exchange rates on each conversion.
@@ -57,13 +65,13 @@ interface MoneyConverterInterface
     /**
      * Converts a given amount of money from one currency to another.
      *
-     * @param int    $money            Amount of money in minor units (cents).
-     * @param string $current_currency Source currency code.
-     * @param string $target_currency  Target currency code.
-     * @param int|null   $on_fail          Action to take if conversion fails; defaults to throwing an exception.
-     *                                   Use ON_FAIL_THROW_EXCEPTION to throw an exception or
-     *                                  ON_FAIL_FETCH_EXCHANGE_RATES to fetch exchange rates.
-     * @param CarbonInterface|null $date_time Date and time for the conversion; defaults to now.
+     * @param int                  $money            Amount of money in minor units (cents).
+     * @param string               $current_currency Source currency code.
+     * @param string               $target_currency  Target currency code.
+     * @param CarbonInterface|null $date_time        Date and time for the conversion; defaults to now.
+     * @param int|null             $on_fail          Action to take if conversion fails; defaults to throwing an exception.
+     *                                                   Use ON_FAIL_THROW_EXCEPTION to throw an exception or
+     *                                                   ON_FAIL_FETCH_EXCHANGE_RATES to fetch exchange rates.
      *
      * @return int Converted amount of money in minor units (cents).
      *
