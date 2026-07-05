@@ -78,3 +78,33 @@ it('applies bulk options without a fluent chain', function () {
         expect($amount)->toBeLessThan(9500);
     }
 });
+
+it('interpolates via convertHistorical options without a fluent chain', function () {
+    $this->seedHistoricalRate('USD', 'EUR', 0.90, Carbon::parse('2024-01-01'));
+    $this->seedHistoricalRate('USD', 'EUR', 0.95, Carbon::parse('2024-01-15'));
+
+    $result = $this->converter->convertHistorical(
+        10000,
+        'USD',
+        'EUR',
+        Carbon::parse('2024-01-08'),
+        MoneyConverterOptions::defaults()->withInterpolate()
+    );
+
+    expect($result)->toBeGreaterThan(9000);
+    expect($result)->toBeLessThan(9500);
+});
+
+it('extrapolates via convertHistorical options without a fluent chain', function () {
+    $this->seedHistoricalRate('USD', 'EUR', 0.90, Carbon::parse('2024-01-01'));
+
+    $result = $this->converter->convertHistorical(
+        10000,
+        'USD',
+        'EUR',
+        Carbon::parse('2024-06-01'),
+        MoneyConverterOptions::defaults()->withExtrapolate()
+    );
+
+    expect($result)->toBe(9000);
+});

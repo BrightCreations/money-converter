@@ -1,7 +1,10 @@
 <?php
 
+use BrightCreations\ExchangeRates\Facades\ExchangeRate;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
+use BrightCreations\MoneyConverter\DTOs\MoneyConverterOptions;
 use BrightCreations\MoneyConverter\Tests\Concerns\SeedsExchangeRates;
+use Illuminate\Support\Collection;
 
 uses(SeedsExchangeRates::class);
 
@@ -50,4 +53,19 @@ it('applies on_fail only for a single convert call', function () {
     }
 
     expect($singleton->isThrowOnFail())->toBeTrue();
+});
+
+it('fetches fresh rates when convertCurrent is called with fetchOnFail options', function () {
+    ExchangeRate::shouldReceive('storeBulkExchangeRatesForMultipleCurrencies')
+        ->once()
+        ->with(['USD', 'EUR'])
+        ->andReturnUsing(function () {
+            $this->seedCurrentRate('USD', 'EUR', 0.85);
+
+            return new Collection;
+        });
+
+    $options = MoneyConverterOptions::defaults()->withFetchOnFail();
+
+    expect($this->converter->convertCurrent(10000, 'USD', 'EUR', $options))->toBe(8500);
 });

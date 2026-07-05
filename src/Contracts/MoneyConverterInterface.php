@@ -118,9 +118,10 @@ interface MoneyConverterInterface
      * @param  int  $money  Amount of money in minor units (cents).
      * @param  string  $current_currency  Source currency code.
      * @param  string  $target_currency  Target currency code.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int Converted amount of money in minor units (cents).
      */
-    public function convertCurrent(int $money, string $current_currency, string $target_currency): int;
+    public function convertCurrent(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int;
 
     /**
      * Converts a given amount of money from one currency to another using the fresh exchange rate.
@@ -128,9 +129,10 @@ interface MoneyConverterInterface
      * @param  int  $money  Amount of money in minor units (cents).
      * @param  string  $current_currency  Source currency code.
      * @param  string  $target_currency  Target currency code.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int Converted amount of money in minor units (cents).
      */
-    public function convertFresh(int $money, string $current_currency, string $target_currency): int;
+    public function convertFresh(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int;
 
     /**
      * Converts a given amount of money from one currency to another using the historical exchange rate.
@@ -142,9 +144,10 @@ interface MoneyConverterInterface
      * @param  string  $current_currency  Source currency code.
      * @param  string  $target_currency  Target currency code.
      * @param  CarbonInterface  $date_time  Date and time for the conversion.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int Converted amount of money in minor units (cents).
      */
-    public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time): int;
+    public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?MoneyConverterOptions $options = null): int;
 
     /**
      * Converts a given amount of money from one currency to another using the today's exchange rate.
@@ -152,7 +155,8 @@ interface MoneyConverterInterface
      * @param  int  $money  Amount of money in minor units (cents).
      * @param  string  $current_currency  Source currency code.
      * @param  string  $target_currency  Target currency code.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int Converted amount of money in minor units (cents).
      */
-    public function convertToday(int $money, string $current_currency, string $target_currency): int;
+    public function convertToday(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int;
 }

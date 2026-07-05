@@ -80,6 +80,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Default conversion options
+    |--------------------------------------------------------------------------
+    |
+    | Applied when resolving MoneyConverter from the container. Per-call
+    | MoneyConverterOptions or fluent methods override these defaults.
+    |
+    | on_fail: "throw" (default) or "fetch"
+    |
+    */
+    'default_options' => [
+        'extrapolate' => false,
+        'interpolate' => false,
+        'needs_fresh' => false,
+        'on_fail' => 'throw',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Rounding mode for currency conversion
     |--------------------------------------------------------------------------
     |

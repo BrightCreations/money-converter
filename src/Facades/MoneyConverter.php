@@ -20,10 +20,10 @@ use Illuminate\Support\Facades\Facade;
  * @method static MoneyConversionResult convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null)
  * @method static int[] convertBulk(array $items, ?MoneyConverterOptions $options = null)
  * @method static MoneyConversionResult[] convertBulkWithResult(array $items, ?MoneyConverterOptions $options = null)
- * @method static int convertCurrent(int $money, string $current_currency, string $target_currency)
- * @method static int convertFresh(int $money, string $current_currency, string $target_currency)
- * @method static int convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time)
- * @method static int convertToday(int $money, string $current_currency, string $target_currency)
+ * @method static int convertCurrent(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null)
+ * @method static int convertFresh(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null)
+ * @method static int convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?MoneyConverterOptions $options = null)
+ * @method static int convertToday(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null)
  */
 class MoneyConverter extends Facade
 {

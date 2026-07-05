@@ -40,7 +40,7 @@ final class MoneyConverter implements MoneyConverterInterface
     public function __construct(
         private readonly CurrencyConverter $converter
     ) {
-        $this->options = MoneyConverterOptions::defaults();
+        $this->options = MoneyConverterOptions::fromConfig(Config::get('money-converter.default_options'));
         $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::DOWN);
     }
 
@@ -203,18 +203,19 @@ final class MoneyConverter implements MoneyConverterInterface
         );
     }
 
-    public function convertCurrent(int $money, string $current_currency, string $target_currency): int
+    public function convertCurrent(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
         if ($current_currency === $target_currency) {
             return $money;
         }
 
+        $instance = $options !== null ? $this->withOptions($options) : $this;
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->getConvertedMoney($money, $target_currency);
+            return $instance->getConvertedMoney($money, $target_currency);
         } catch (CurrencyConversionException $e) {
-            if ($this->isFetchOnFail()) {
-                return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
+            if ($instance->isFetchOnFail()) {
+                return $instance->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
             }
 
             $this->logError($e, func_get_args(), __METHOD__);
@@ -225,45 +226,48 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    public function convertFresh(int $money, string $current_currency, string $target_currency): int
+    public function convertFresh(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
         if ($current_currency === $target_currency) {
             return $money;
         }
 
+        $instance = $options !== null ? $this->withOptions($options) : $this;
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
+            return $instance->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using fresh exchange rates: '.$th->getMessage(), $th);
         }
     }
 
-    public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time): int
+    public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?MoneyConverterOptions $options = null): int
     {
         if ($current_currency === $target_currency) {
             return $money;
         }
 
+        $instance = $options !== null ? $this->withOptions($options) : $this;
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->resolveHistoricalConversion($money, $target_currency, $date_time)->amount;
+            return $instance->resolveHistoricalConversion($money, $target_currency, $date_time)->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using historical exchange rates: '.$th->getMessage(), $th);
         }
     }
 
-    public function convertToday(int $money, string $current_currency, string $target_currency): int
+    public function convertToday(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
         if ($current_currency === $target_currency) {
             return $money;
         }
 
+        $instance = $options !== null ? $this->withOptions($options) : $this;
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->resolveHistoricalConversion($money, $target_currency, Carbon::now()->startOfDay())->amount;
+            return $instance->resolveHistoricalConversion($money, $target_currency, Carbon::now()->startOfDay())->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX." Error while converting currency using today's exchange rates: ".$th->getMessage(), $th);

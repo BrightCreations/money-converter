@@ -41,3 +41,28 @@ it('supports withThrowOnFail', function () {
 
     expect($options->onFail)->toBe(MoneyConverterInterface::ON_FAIL_THROW_EXCEPTION);
 });
+
+it('builds options from config array', function () {
+    $options = MoneyConverterOptions::fromConfig([
+        'extrapolate' => true,
+        'interpolate' => true,
+        'needs_fresh' => true,
+        'on_fail' => 'fetch',
+    ]);
+
+    expect($options->extrapolate)->toBeTrue();
+    expect($options->interpolate)->toBeTrue();
+    expect($options->needsFresh)->toBeTrue();
+    expect($options->onFail)->toBe(MoneyConverterInterface::ON_FAIL_FETCH_EXCHANGE_RATES);
+});
+
+it('returns defaults for null or empty config', function () {
+    $defaults = MoneyConverterOptions::defaults();
+
+    expect(MoneyConverterOptions::fromConfig(null)->onFail)->toBe($defaults->onFail);
+    expect(MoneyConverterOptions::fromConfig([])->interpolate)->toBe($defaults->interpolate);
+});
+
+it('rejects invalid on_fail string in config', function () {
+    MoneyConverterOptions::fromConfig(['on_fail' => 'invalid']);
+})->throws(InvalidArgumentException::class);

@@ -17,7 +17,7 @@ A Laravel package for converting money between currencies using stored exchange 
 |------------|---------|
 | PHP | `>=8.1` |
 | Laravel | `10`, `11`, or `12` (database component) |
-| [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates) | `^0.8.0` (v0.8.x and later 0.x releases) |
+| [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates) | `^0.9.0` |
 
 ## Installation
 
@@ -186,14 +186,14 @@ $eurCents = MoneyConverter::fetchOnFail()
 
 | Method | Description |
 |--------|-------------|
-| `convert($money, $from, $to, $dateTime = null, $onFail = null)` | Routes to current, fresh, or historical conversion based on date and flags |
-| `convertCurrent($money, $from, $to)` | Uses rates in the database (PDO provider) |
-| `convertFresh($money, $from, $to)` | Fetches fresh rates via exchange-rates, then converts |
-| `convertToday($money, $from, $to)` | Historical conversion at today's `startOfDay()` |
-| `convertHistorical($money, $from, $to, $dateTime)` | Historical fallback chain (see below) |
-| `convertWithResult($money, $from, $to, $dateTime = null, $onFail = null)` | Same routing as `convert()` but returns `MoneyConversionResult` (amount, rate, strategy, provider) |
-| `convertBulk(ConversionItem[] $items)` | Batch conversion; returns `int[]` in input order |
-| `convertBulkWithResult(ConversionItem[] $items)` | Batch conversion with metadata per item |
+| `convert($money, $from, $to, $dateTime = null, $onFail = null, $options = null)` | Routes to current, fresh, or historical conversion based on date and flags |
+| `convertCurrent($money, $from, $to, $options = null)` | Uses rates in the database (PDO provider) |
+| `convertFresh($money, $from, $to, $options = null)` | Fetches fresh rates via exchange-rates, then converts |
+| `convertToday($money, $from, $to, $options = null)` | Historical conversion at today's `startOfDay()` |
+| `convertHistorical($money, $from, $to, $dateTime, $options = null)` | Historical fallback chain (see below) |
+| `convertWithResult($money, $from, $to, $dateTime = null, $onFail = null, $options = null)` | Same routing as `convert()` but returns `MoneyConversionResult` (amount, rate, strategy, provider) |
+| `convertBulk(ConversionItem[] $items, $options = null)` | Batch conversion; returns `int[]` in input order |
+| `convertBulkWithResult(ConversionItem[] $items, $options = null)` | Batch conversion with metadata per item |
 
 `ConversionItem` accepts `amount`, `from`, `to`, and optional `date` for historical rows.
 
@@ -222,13 +222,28 @@ $opts = MoneyConverterOptions::defaults()
 
 $result = $service->convertWithResult(10000, 'USD', 'EUR', $date, options: $opts);
 $amounts = $service->convertBulk($items, $opts);
+$amount = $service->convertHistorical(10000, 'USD', 'EUR', $date, $opts);
 ```
+
+Set application-wide defaults in `config/money-converter.php`:
+
+```php
+'default_options' => [
+    'extrapolate' => false,
+    'interpolate' => false,
+    'needs_fresh' => false,
+    'on_fail' => 'throw', // or 'fetch'
+],
+```
+
+`MoneyConverter` reads these when resolved from the container. Per-call `$options` or fluent methods override them.
 
 Precedence for `convert()` / `convertWithResult()`:
 
 1. Explicit `$on_fail` argument (when non-null) overrides `options->onFail` for that call
 2. `$options` argument (when non-null) overrides instance options
 3. Instance options from fluent methods or `withOptions()`
+4. Config `default_options` (constructor baseline)
 
 ### Constants
 

@@ -14,11 +14,14 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 - Bulk historical interpolation prefetch via `getBulkBoundingHistoricalRates` (requires exchange-rates `^0.9.0`).
 - `MoneyConverterFetchOnFailTest` covering API fetch fallback when the database has no exact historical rate.
 - `MoneyConverterOptions` immutable DTO and `withOptions()` for explicit per-call configuration.
+- Config `default_options` for application-wide conversion behaviour (`MoneyConverterOptions::fromConfig()`).
+- `?MoneyConverterOptions` on `convertHistorical`, `convertToday`, `convertCurrent`, and `convertFresh`.
 
 ### Changed
 
 - **Breaking:** `illuminate/support` now requires `^10.0` (Laravel 9 no longer supported).
 - Pin `brightcreations/exchange-rates` to `^0.9.0`; use `ExchangeRate::supportsHistoricalApiFetch()` and `getBulkBoundingHistoricalRates()` directly (removed transitional `method_exists` guards).
+- Committed `composer.lock` for reproducible CI installs.
 
 ## [0.6.0]
 

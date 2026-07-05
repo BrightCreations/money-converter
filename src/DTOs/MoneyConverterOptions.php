@@ -18,6 +18,44 @@ final class MoneyConverterOptions
         return new self;
     }
 
+    public static function fromConfig(?array $config = null): self
+    {
+        if ($config === null || $config === []) {
+            return self::defaults();
+        }
+
+        $options = self::defaults();
+
+        if (array_key_exists('extrapolate', $config)) {
+            $options = $options->withExtrapolate((bool) $config['extrapolate']);
+        }
+
+        if (array_key_exists('interpolate', $config)) {
+            $options = $options->withInterpolate((bool) $config['interpolate']);
+        }
+
+        if (array_key_exists('needs_fresh', $config)) {
+            $options = $options->withNeedsFresh((bool) $config['needs_fresh']);
+        }
+
+        if (array_key_exists('on_fail', $config)) {
+            $options = $options->withOnFail(self::mapOnFailFromConfig($config['on_fail']));
+        }
+
+        return $options;
+    }
+
+    private static function mapOnFailFromConfig(mixed $onFail): int
+    {
+        return match ($onFail) {
+            'throw' => MoneyConverterInterface::ON_FAIL_THROW_EXCEPTION,
+            'fetch' => MoneyConverterInterface::ON_FAIL_FETCH_EXCHANGE_RATES,
+            default => throw new \InvalidArgumentException(
+                '[MoneyConverter] Invalid default_options.on_fail value: '.(string) $onFail.'. Expected: "throw" or "fetch".'
+            ),
+        };
+    }
+
     public function withExtrapolate(bool $extrapolate = true): self
     {
         return new self(

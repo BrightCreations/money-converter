@@ -223,6 +223,24 @@ After this plan is executed, a developer should be able to:
 
 ---
 
+## Phase 6 — Options ergonomics & production readiness (P2)
+
+**Goal:** Consistent `MoneyConverterOptions` across all convert entry points; config-driven defaults; stable CI.
+
+### money-converter
+
+| # | Task | Detail |
+|---|------|--------|
+| 6.1 | Config `default_options` | `extrapolate`, `interpolate`, `needs_fresh`, `on_fail` in config; `MoneyConverterOptions::fromConfig()` |
+| 6.2 | Options on specialized methods | `?MoneyConverterOptions` on `convertHistorical`, `convertToday`, `convertCurrent`, `convertFresh` |
+| 6.3 | Test matrix gaps | Config defaults, `convertHistorical` via options, `convertCurrent` + `fetchOnFail` |
+| 6.4 | Documentation | README, ENHANCEMENT_PLAN, CHANGELOG |
+| 6.5 | `composer.lock` | Committed for reproducible CI |
+
+**Exit criteria:** All convert methods accept options; config defaults work; 45+ tests green; lock file committed.
+
+---
+
 ## Package responsibility matrix
 
 | Concern | money-converter | exchange-rates |
@@ -248,8 +266,9 @@ After this plan is executed, a developer should be able to:
 | **Phase 3** | Documentation | 2–3 days |
 | **Phase 4** | Architecture & tests | 3–5 days |
 | **Phase 5** | Advanced (as needed) | backlog |
+| **Phase 6** | Options ergonomics & CI | 1–2 days |
 
-Phases 1–3 can ship as **money-converter v0.6.0** with **exchange-rates v0.8.2** (doc/test patch). Phase 4 targets **v0.7.0**. Phase 5 is **v0.8.0+**.
+Phases 1–3 can ship as **money-converter v0.6.0** with **exchange-rates v0.8.2** (doc/test patch). Phase 4 targets **v0.7.0**. Phase 5 is **v0.8.0+**. Phase 6 targets **v0.11.0**.
 
 ---
 
@@ -269,6 +288,11 @@ The following items from this plan should be tracked in **exchange-rates** (copy
 - [x] 4.6 — Date-only vs datetime documentation
 - [x] 5.5 — Bulk bounding helper (`getBulkBoundingHistoricalRates` + bulk interpolate prefetch)
 - [x] 5.6 — Provider capability interface (if needed)
+- [x] 6.1 — Config `default_options` + `MoneyConverterOptions::fromConfig()`
+- [x] 6.2 — Options on `convertHistorical` / `convertToday` / `convertCurrent` / `convertFresh`
+- [x] 6.3 — Config defaults and specialized-method options tests
+- [x] 6.4 — Phase 6 documentation
+- [x] 6.5 — `composer.lock` for CI
 
 ---
 
@@ -288,6 +312,7 @@ Record choices here as work proceeds.
 | 2026-06-30 | Post-Phase 5 backlog | `getBulkBoundingHistoricalRates` in exchange-rates; bulk interpolate prefetch; fetchOnFail API mock test; pin ER ^0.8.8 |
 | 2026-06-30 | MoneyConverterOptions DTO | Immutable options object + `withOptions()`; clone-on-fluent retained; fluent API unchanged |
 | 2026-06-30 | Bulk bounding BC guard removed | Direct `getBulkBoundingHistoricalRates()` call; requires exchange-rates `^0.9.0` |
+| 2026-06-30 | Phase 6 complete | Config `default_options`; options on all convert methods; composer.lock for CI |
 | | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail`; `MoneyConverterOptions` added for explicit per-call config |
 
 ---
