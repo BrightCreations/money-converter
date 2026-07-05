@@ -1,9 +1,9 @@
 # Money Converter + Exchange Rates — Joint Enhancement Plan
 
-**Status:** Draft  
-**Last updated:** 2026-06-30  
-**Primary package:** `brightcreations/money-converter` (v0.5.1)  
-**Supporting package:** `brightcreations/exchange-rates` (v0.8.1)
+**Status:** Phase 7 complete — v0.12.0 released  
+**Last updated:** 2026-07-05  
+**Primary package:** `brightcreations/money-converter` (v0.12.0)  
+**Supporting package:** `brightcreations/exchange-rates` (v0.9.0)
 
 ---
 

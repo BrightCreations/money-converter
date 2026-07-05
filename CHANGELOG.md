@@ -6,6 +6,8 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-05
+
 ### Added
 
 - Config-driven `exchange_rates.configurable.rates` for local development via `ExchangeRateProvidersEnum::CONFIGURABLE`.
@@ -22,7 +24,7 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 ### Changed
 
 - **Breaking:** `illuminate/support` now requires `^10.0` (Laravel 9 no longer supported).
-- Pin `brightcreations/exchange-rates` to `^0.9.0`; use `ExchangeRate::supportsHistoricalApiFetch()` and `getBulkBoundingHistoricalRates()` directly (removed transitional `method_exists` guards).
+- **Breaking:** Pin `brightcreations/exchange-rates` to `^0.9.0`; use `ExchangeRate::supportsHistoricalApiFetch()` and `getBulkBoundingHistoricalRates()` directly (removed transitional `method_exists` guards).
 - Committed `composer.lock` for reproducible CI installs.
 
 ## [0.6.0]
