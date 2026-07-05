@@ -207,6 +207,28 @@ $eurCents = MoneyConverter::fetchOnFail()
 | `throwOnFail()` | Throw on conversion failure (default); returns a new instance |
 | `fetchOnFail()` | Fetch rates from API on failure where the provider supports it; returns a new instance |
 | `isThrowOnFail()` / `isFetchOnFail()` | Inspect current failure mode |
+| `withOptions(MoneyConverterOptions $options)` | Return a new instance with the given options object |
+
+### Options object
+
+For explicit per-call configuration without a fluent chain, pass a `MoneyConverterOptions` instance:
+
+```php
+use BrightCreations\MoneyConverter\DTOs\MoneyConverterOptions;
+
+$opts = MoneyConverterOptions::defaults()
+    ->withFetchOnFail()
+    ->withInterpolate();
+
+$result = $service->convertWithResult(10000, 'USD', 'EUR', $date, options: $opts);
+$amounts = $service->convertBulk($items, $opts);
+```
+
+Precedence for `convert()` / `convertWithResult()`:
+
+1. Explicit `$on_fail` argument (when non-null) overrides `options->onFail` for that call
+2. `$options` argument (when non-null) overrides instance options
+3. Instance options from fluent methods or `withOptions()`
 
 ### Constants
 

@@ -4,6 +4,7 @@ namespace BrightCreations\MoneyConverter\Contracts;
 
 use BrightCreations\MoneyConverter\DTOs\ConversionItem;
 use BrightCreations\MoneyConverter\DTOs\MoneyConversionResult;
+use BrightCreations\MoneyConverter\DTOs\MoneyConverterOptions;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\CarbonInterface;
 
@@ -55,6 +56,11 @@ interface MoneyConverterInterface
     public function fetchOnFail(): static;
 
     /**
+     * Return a new instance configured with the given options.
+     */
+    public function withOptions(MoneyConverterOptions $options): static;
+
+    /**
      * Check if the conversion fails and the exchange rates are fetched.
      */
     public function isFetchOnFail(): bool;
@@ -74,30 +80,37 @@ interface MoneyConverterInterface
      * @param  int|null  $on_fail  Action to take if conversion fails; defaults to throwing an exception.
      *                             Use ON_FAIL_THROW_EXCEPTION to throw an exception or
      *                             ON_FAIL_FETCH_EXCHANGE_RATES to fetch exchange rates.
+     *                             When non-null, overrides {@see MoneyConverterOptions::$onFail} for this call.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int Converted amount of money in minor units (cents).
      *
      * @throws MoneyConversionException conversion fails and on_fail is set to throw.
      */
-    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int;
+    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): int;
 
     /**
      * Converts a given amount and returns metadata about the rate and strategy used.
      *
+     * @param  int|null  $on_fail  When non-null, overrides {@see MoneyConverterOptions::$onFail} for this call.
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
+     *
      * @throws MoneyConversionException
      */
-    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): MoneyConversionResult;
+    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): MoneyConversionResult;
 
     /**
      * @param  ConversionItem[]  $items
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return int[]
      */
-    public function convertBulk(array $items): array;
+    public function convertBulk(array $items, ?MoneyConverterOptions $options = null): array;
 
     /**
      * @param  ConversionItem[]  $items
+     * @param  MoneyConverterOptions|null  $options  Per-call options; when non-null, overrides instance options.
      * @return MoneyConversionResult[]
      */
-    public function convertBulkWithResult(array $items): array;
+    public function convertBulkWithResult(array $items, ?MoneyConverterOptions $options = null): array;
 
     /**
      * Converts a given amount of money from one currency to another using the current exchange rate.

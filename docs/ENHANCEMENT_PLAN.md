@@ -286,7 +286,8 @@ Record choices here as work proceeds.
 | 2026-06-30 | Phase 4 complete (no release) | Clone-on-fluent for singleton safety; HALF_UP @ 10dp intermediate math; expanded Pest suite + CI; exchange-rates seed trait + date semantics docs |
 | 2026-06-30 | Phase 5 complete (no release) | Configurable rates in config; convertBulk/convertWithResult; supportsHistoricalApiFetch; Laravel 10+ only; 5.5 bulk bounding deferred |
 | 2026-06-30 | Post-Phase 5 backlog | `getBulkBoundingHistoricalRates` in exchange-rates; bulk interpolate prefetch; fetchOnFail API mock test; pin ER ^0.8.8 |
-| | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail` (no `MoneyConverterOptions` DTO in this phase) |
+| 2026-06-30 | MoneyConverterOptions DTO | Immutable options object + `withOptions()`; clone-on-fluent retained; fluent API unchanged |
+| | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail`; `MoneyConverterOptions` added for explicit per-call config |
 
 ---
 

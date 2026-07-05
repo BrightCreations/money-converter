@@ -13,6 +13,7 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 - `convertWithResult()` returning `MoneyConversionResult` (rate, strategy, provider).
 - Bulk historical interpolation prefetch via `getBulkBoundingHistoricalRates` (requires exchange-rates `^0.8.8`).
 - `MoneyConverterFetchOnFailTest` covering API fetch fallback when the database has no exact historical rate.
+- `MoneyConverterOptions` immutable DTO and `withOptions()` for explicit per-call configuration.
 
 ### Changed
 

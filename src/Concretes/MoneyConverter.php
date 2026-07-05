@@ -15,6 +15,7 @@ use BrightCreations\ExchangeRates\Facades\HistoricalExchangeRate;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 use BrightCreations\MoneyConverter\DTOs\ConversionItem;
 use BrightCreations\MoneyConverter\DTOs\MoneyConversionResult;
+use BrightCreations\MoneyConverter\DTOs\MoneyConverterOptions;
 use BrightCreations\MoneyConverter\Enums\ConversionStrategy;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\Carbon;
@@ -32,97 +33,72 @@ final class MoneyConverter implements MoneyConverterInterface
 
     private const INTERMEDIATE_ROUNDING = RoundingMode::HALF_UP;
 
-    private bool $extrapolate;
-
-    private bool $interpolate;
-
-    private bool $needs_fresh;
-
-    private int $on_fail;
+    private MoneyConverterOptions $options;
 
     private RoundingMode $rounding_mode;
 
     public function __construct(
         private readonly CurrencyConverter $converter
     ) {
-        $this->extrapolate = false;
-        $this->interpolate = false;
-        $this->needs_fresh = false;
-        $this->on_fail = self::ON_FAIL_THROW_EXCEPTION;
+        $this->options = MoneyConverterOptions::defaults();
         $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::DOWN);
+    }
+
+    public function withOptions(MoneyConverterOptions $options): static
+    {
+        $clone = clone $this;
+        $clone->options = $options;
+
+        return $clone;
     }
 
     public function extrapolate(bool $extrapolate = true): static
     {
-        $clone = clone $this;
-        $clone->extrapolate = $extrapolate;
-
-        return $clone;
+        return $this->withOptions($this->options->withExtrapolate($extrapolate));
     }
 
     public function interpolate(bool $interpolate = true): static
     {
-        $clone = clone $this;
-        $clone->interpolate = $interpolate;
-
-        return $clone;
+        return $this->withOptions($this->options->withInterpolate($interpolate));
     }
 
     public function needsFresh(bool $needs_fresh = true): static
     {
-        $clone = clone $this;
-        $clone->needs_fresh = $needs_fresh;
-
-        return $clone;
+        return $this->withOptions($this->options->withNeedsFresh($needs_fresh));
     }
 
     public function throwOnFail(): static
     {
-        $clone = clone $this;
-        $clone->on_fail = static::ON_FAIL_THROW_EXCEPTION;
-
-        return $clone;
+        return $this->withOptions($this->options->withThrowOnFail());
     }
 
     public function fetchOnFail(): static
     {
-        $clone = clone $this;
-        $clone->on_fail = static::ON_FAIL_FETCH_EXCHANGE_RATES;
-
-        return $clone;
+        return $this->withOptions($this->options->withFetchOnFail());
     }
 
     public function isFetchOnFail(): bool
     {
-        return $this->on_fail === static::ON_FAIL_FETCH_EXCHANGE_RATES;
+        return $this->options->onFail === static::ON_FAIL_FETCH_EXCHANGE_RATES;
     }
 
     public function isThrowOnFail(): bool
     {
-        return $this->on_fail === static::ON_FAIL_THROW_EXCEPTION;
+        return $this->options->onFail === static::ON_FAIL_THROW_EXCEPTION;
     }
 
-    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int
+    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): int
     {
-        return $this->convertWithResult($money, $current_currency, $target_currency, $date_time, $on_fail)->amount;
+        return $this->convertWithResult($money, $current_currency, $target_currency, $date_time, $on_fail, $options)->amount;
     }
 
-    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): MoneyConversionResult
+    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): MoneyConversionResult
     {
         if ($current_currency === $target_currency) {
             return ResolvedConversion::sameCurrency($money)->toResult();
         }
 
-        $instance = $this;
-
-        if ($on_fail !== null) {
-            $instance = clone $this;
-            $instance->on_fail = match ($on_fail) {
-                static::ON_FAIL_FETCH_EXCHANGE_RATES => static::ON_FAIL_FETCH_EXCHANGE_RATES,
-                static::ON_FAIL_THROW_EXCEPTION => static::ON_FAIL_THROW_EXCEPTION,
-                default => throw new \InvalidArgumentException(self::LOG_PREFIX.' Invalid on fail value: '.$on_fail.'. Expected: '.static::ON_FAIL_FETCH_EXCHANGE_RATES.' for fetching exchange rates'.' or '.static::ON_FAIL_THROW_EXCEPTION.' for throwing an exception. Got: '.$on_fail),
-            };
-        }
+        $instance = $this->resolveInstanceForCall($on_fail, $options);
 
         if ($date_time) {
             return $instance->resolveHistoricalConversion(
@@ -132,7 +108,7 @@ final class MoneyConverter implements MoneyConverterInterface
             )->toResult();
         }
 
-        if ($instance->needs_fresh) {
+        if ($instance->options->needsFresh) {
             return $instance->resolveFreshConversion(
                 Money::ofMinor($money, $current_currency),
                 $target_currency
@@ -145,21 +121,23 @@ final class MoneyConverter implements MoneyConverterInterface
         )->toResult();
     }
 
-    public function convertBulk(array $items): array
+    public function convertBulk(array $items, ?MoneyConverterOptions $options = null): array
     {
         return array_map(
             fn (MoneyConversionResult $result) => $result->amount,
-            $this->convertBulkWithResult($items)
+            $this->convertBulkWithResult($items, $options)
         );
     }
 
-    public function convertBulkWithResult(array $items): array
+    public function convertBulkWithResult(array $items, ?MoneyConverterOptions $options = null): array
     {
         if ($items === []) {
             return [];
         }
 
-        if ($this->needs_fresh) {
+        $instance = $options !== null ? $this->withOptions($options) : $this;
+
+        if ($instance->options->needsFresh) {
             $currencies = [];
             foreach ($items as $item) {
                 if ($item->from !== $item->to) {
@@ -177,7 +155,7 @@ final class MoneyConverter implements MoneyConverterInterface
         $historicalPairDtos = [];
 
         foreach ($items as $item) {
-            if ($item->from === $item->to || $this->needs_fresh) {
+            if ($item->from === $item->to || $instance->options->needsFresh) {
                 continue;
             }
 
@@ -198,11 +176,11 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $boundingCache = collect();
 
-        if ($this->interpolate && $historicalPairDtos !== []) {
+        if ($instance->options->interpolate && $historicalPairDtos !== []) {
             $boundingDtos = [];
 
             foreach ($items as $item) {
-                if ($item->from === $item->to || $item->date === null || $this->needs_fresh) {
+                if ($item->from === $item->to || $item->date === null || $instance->options->needsFresh) {
                     continue;
                 }
 
@@ -220,7 +198,7 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         return array_map(
-            fn (ConversionItem $item) => $this->resolveBulkItem($item, $currentRates, $historicalRates, $boundingCache)->toResult(),
+            fn (ConversionItem $item) => $instance->resolveBulkItem($item, $currentRates, $historicalRates, $boundingCache)->toResult(),
             $items
         );
     }
@@ -300,7 +278,7 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $money = Money::ofMinor($item->amount, $item->from);
 
-        if (! $this->needs_fresh && $item->date === null) {
+        if (! $this->options->needsFresh && $item->date === null) {
             $pairKey = $item->from.'_'.$item->to;
             $prefetched = $currentRates->get($pairKey)?->first();
 
@@ -315,7 +293,7 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        if (! $this->needs_fresh && $item->date !== null) {
+        if (! $this->options->needsFresh && $item->date !== null) {
             $prefetched = $historicalRates
                 ->get($item->from)
                 ?->get($item->to)
@@ -337,7 +315,7 @@ final class MoneyConverter implements MoneyConverterInterface
             return $this->resolveHistoricalConversion($money, $item->to, $item->date, $boundingCache);
         }
 
-        if ($this->needs_fresh) {
+        if ($this->options->needsFresh) {
             return $this->resolveFreshConversion($money, $item->to);
         }
 
@@ -491,7 +469,7 @@ final class MoneyConverter implements MoneyConverterInterface
             Log::debug(self::LOG_PREFIX.' Proxy-currency strategy failed, continuing to next strategy: '.$e->getMessage());
         }
 
-        if ($this->interpolate) {
+        if ($this->options->interpolate) {
             try {
                 $result = $this->tryInterpolation($money, $current_currency, $target_currency, $date_time, $boundingCache);
                 if ($result !== null) {
@@ -502,7 +480,7 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        if ($this->extrapolate) {
+        if ($this->options->extrapolate) {
             try {
                 $result = $this->tryExtrapolation($money, $current_currency, $target_currency, $date_time);
                 if ($result !== null) {
@@ -611,6 +589,21 @@ final class MoneyConverter implements MoneyConverterInterface
             ?->get($item->to)
             ?->get($item->date->format('Y-m-d'))
             ?->first() !== null;
+    }
+
+    private function resolveInstanceForCall(?int $on_fail, ?MoneyConverterOptions $options): self
+    {
+        $instance = $this;
+
+        if ($options !== null) {
+            $instance = $instance->withOptions($options);
+        }
+
+        if ($on_fail !== null) {
+            $instance = $instance->withOptions($instance->options->withOnFail($on_fail));
+        }
+
+        return $instance;
     }
 
     private function normalizeRate(mixed $rate): BigDecimal
