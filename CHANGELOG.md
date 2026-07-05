@@ -16,6 +16,8 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 - `MoneyConverterOptions` immutable DTO and `withOptions()` for explicit per-call configuration.
 - Config `default_options` for application-wide conversion behaviour (`MoneyConverterOptions::fromConfig()`).
 - `?MoneyConverterOptions` on `convertHistorical`, `convertToday`, `convertCurrent`, and `convertFresh`.
+- `ConversionPerformed` Laravel event for audit trails (input context + `MoneyConversionResult`; one event per bulk item).
+- Built-in `LogConversionPerformed` listener registered via `events.listeners` config.
 
 ### Changed
 

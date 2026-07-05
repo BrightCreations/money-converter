@@ -5,7 +5,6 @@ namespace BrightCreations\MoneyConverter\Concretes;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Brick\Money\CurrencyConverter;
-use Brick\Money\Exception\CurrencyConversionException;
 use Brick\Money\Money;
 use BrightCreations\ExchangeRates\DTOs\CurrenciesPairDto;
 use BrightCreations\ExchangeRates\DTOs\HistoricalCurrenciesPairDto;
@@ -17,6 +16,7 @@ use BrightCreations\MoneyConverter\DTOs\ConversionItem;
 use BrightCreations\MoneyConverter\DTOs\MoneyConversionResult;
 use BrightCreations\MoneyConverter\DTOs\MoneyConverterOptions;
 use BrightCreations\MoneyConverter\Enums\ConversionStrategy;
+use BrightCreations\MoneyConverter\Events\ConversionPerformed;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -95,30 +95,42 @@ final class MoneyConverter implements MoneyConverterInterface
     public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): MoneyConversionResult
     {
         if ($current_currency === $target_currency) {
-            return ResolvedConversion::sameCurrency($money)->toResult();
+            $result = ResolvedConversion::sameCurrency($money)->toResult();
+            $this->notifyConversionPerformed($money, $current_currency, $target_currency, $date_time, $result);
+
+            return $result;
         }
 
         $instance = $this->resolveInstanceForCall($on_fail, $options);
 
         if ($date_time) {
-            return $instance->resolveHistoricalConversion(
+            $result = $instance->resolveHistoricalConversion(
                 Money::ofMinor($money, $current_currency),
                 $target_currency,
                 $date_time
             )->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, $date_time, $result);
+
+            return $result;
         }
 
         if ($instance->options->needsFresh) {
-            return $instance->resolveFreshConversion(
+            $result = $instance->resolveFreshConversion(
                 Money::ofMinor($money, $current_currency),
                 $target_currency
             )->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
+
+            return $result;
         }
 
-        return $instance->resolveCurrentConversion(
+        $result = $instance->resolveCurrentConversion(
             Money::ofMinor($money, $current_currency),
             $target_currency
         )->toResult();
+        $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
+
+        return $result;
     }
 
     public function convertBulk(array $items, ?MoneyConverterOptions $options = null): array
@@ -197,29 +209,34 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        return array_map(
-            fn (ConversionItem $item) => $instance->resolveBulkItem($item, $currentRates, $historicalRates, $boundingCache)->toResult(),
-            $items
-        );
+        $results = [];
+
+        foreach ($items as $item) {
+            $result = $instance->resolveBulkItem($item, $currentRates, $historicalRates, $boundingCache)->toResult();
+            $instance->notifyConversionPerformed($item->amount, $item->from, $item->to, $item->date, $result);
+            $results[] = $result;
+        }
+
+        return $results;
     }
 
     public function convertCurrent(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
+        $instance = $options !== null ? $this->withOptions($options) : $this;
+
         if ($current_currency === $target_currency) {
+            $result = ResolvedConversion::sameCurrency($money)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
+
             return $money;
         }
 
-        $instance = $options !== null ? $this->withOptions($options) : $this;
-        $money = Money::ofMinor($money, $current_currency);
+        $moneyObject = Money::ofMinor($money, $current_currency);
         try {
-            return $instance->getConvertedMoney($money, $target_currency);
-        } catch (CurrencyConversionException $e) {
-            if ($instance->isFetchOnFail()) {
-                return $instance->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
-            }
+            $result = $instance->resolveCurrentConversion($moneyObject, $target_currency)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
 
-            $this->logError($e, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency with current exchange rates: '.$e->getMessage(), $e);
+            return $result->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency with current exchange rates: '.$th->getMessage(), $th);
@@ -228,14 +245,21 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertFresh(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
+        $instance = $options !== null ? $this->withOptions($options) : $this;
+
         if ($current_currency === $target_currency) {
+            $result = ResolvedConversion::sameCurrency($money)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
+
             return $money;
         }
 
-        $instance = $options !== null ? $this->withOptions($options) : $this;
-        $money = Money::ofMinor($money, $current_currency);
+        $moneyObject = Money::ofMinor($money, $current_currency);
         try {
-            return $instance->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
+            $result = $instance->resolveFreshConversion($moneyObject, $target_currency)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, null, $result);
+
+            return $result->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using fresh exchange rates: '.$th->getMessage(), $th);
@@ -244,14 +268,21 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertHistorical(int $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?MoneyConverterOptions $options = null): int
     {
+        $instance = $options !== null ? $this->withOptions($options) : $this;
+
         if ($current_currency === $target_currency) {
+            $result = ResolvedConversion::sameCurrency($money)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, $date_time, $result);
+
             return $money;
         }
 
-        $instance = $options !== null ? $this->withOptions($options) : $this;
-        $money = Money::ofMinor($money, $current_currency);
+        $moneyObject = Money::ofMinor($money, $current_currency);
         try {
-            return $instance->resolveHistoricalConversion($money, $target_currency, $date_time)->amount;
+            $result = $instance->resolveHistoricalConversion($moneyObject, $target_currency, $date_time)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, $date_time, $result);
+
+            return $result->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using historical exchange rates: '.$th->getMessage(), $th);
@@ -260,14 +291,22 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convertToday(int $money, string $current_currency, string $target_currency, ?MoneyConverterOptions $options = null): int
     {
+        $instance = $options !== null ? $this->withOptions($options) : $this;
+        $date = Carbon::now()->startOfDay();
+
         if ($current_currency === $target_currency) {
+            $result = ResolvedConversion::sameCurrency($money)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, $date, $result);
+
             return $money;
         }
 
-        $instance = $options !== null ? $this->withOptions($options) : $this;
-        $money = Money::ofMinor($money, $current_currency);
+        $moneyObject = Money::ofMinor($money, $current_currency);
         try {
-            return $instance->resolveHistoricalConversion($money, $target_currency, Carbon::now()->startOfDay())->amount;
+            $result = $instance->resolveHistoricalConversion($moneyObject, $target_currency, $date)->toResult();
+            $instance->notifyConversionPerformed($money, $current_currency, $target_currency, $date, $result);
+
+            return $result->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX." Error while converting currency using today's exchange rates: ".$th->getMessage(), $th);
@@ -608,6 +647,20 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         return $instance;
+    }
+
+    private function notifyConversionPerformed(
+        int $inputAmount,
+        string $from,
+        string $to,
+        ?CarbonInterface $date,
+        MoneyConversionResult $result,
+    ): void {
+        if (! Config::get('money-converter.events.dispatch_conversion_performed', true)) {
+            return;
+        }
+
+        ConversionPerformed::dispatch($inputAmount, $from, $to, $date, $result);
     }
 
     private function normalizeRate(mixed $rate): BigDecimal

@@ -36,6 +36,7 @@ class MoneyConverterServiceProvider extends ServiceProvider
         $this->registerExchangeRateProvider();
         $this->registerDependencyCurrencyConverter();
         $this->registerServices();
+        $this->app->register(MoneyConverterEventServiceProvider::class);
     }
 
     public function registerExchangeRateProviderBuilders(): void

@@ -245,6 +245,39 @@ Precedence for `convert()` / `convertWithResult()`:
 3. Instance options from fluent methods or `withOptions()`
 4. Config `default_options` (constructor baseline)
 
+### Audit events
+
+After each successful conversion, the package dispatches `BrightCreations\MoneyConverter\Events\ConversionPerformed` (one event per bulk item). Listeners are registered from `config/money-converter.php`; the default includes `LogConversionPerformed`, which writes an `info` log with input/output amounts, currencies, rate, strategy, and provider.
+
+Disable event dispatch via `.env`:
+
+```env
+MONEY_CONVERTER_DISPATCH_CONVERSION_EVENTS=false
+```
+
+Configure listeners in `config/money-converter.php` (remove `LogConversionPerformed` to turn off package logging, or add your own):
+
+```php
+use BrightCreations\MoneyConverter\Listeners\LogConversionPerformed;
+
+'events' => [
+    'listeners' => [
+        LogConversionPerformed::class,
+        \App\Listeners\PersistConversionAudit::class,
+    ],
+],
+```
+
+Or in your app's `EventServiceProvider`:
+
+```php
+protected $listen = [
+    \BrightCreations\MoneyConverter\Events\ConversionPerformed::class => [
+        \App\Listeners\PersistConversionAudit::class,
+    ],
+];
+```
+
 ### Constants
 
 | Constant | Value | Meaning |

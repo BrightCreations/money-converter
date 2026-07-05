@@ -2,6 +2,7 @@
 
 use Brick\Math\RoundingMode;
 use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
+use BrightCreations\MoneyConverter\Listeners\LogConversionPerformed;
 
 return [
 
@@ -94,6 +95,23 @@ return [
         'interpolate' => false,
         'needs_fresh' => false,
         'on_fail' => 'throw',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Conversion audit events
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, dispatches ConversionPerformed after each successful
+    | conversion (one event per bulk item). Disable via env or config.
+    |
+    */
+    'events' => [
+        'dispatch_conversion_performed' => env('MONEY_CONVERTER_DISPATCH_CONVERSION_EVENTS', true),
+
+        'listeners' => [
+            LogConversionPerformed::class,
+        ],
     ],
 
     /*

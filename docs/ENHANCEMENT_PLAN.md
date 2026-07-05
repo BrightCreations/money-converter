@@ -241,6 +241,20 @@ After this plan is executed, a developer should be able to:
 
 ---
 
+## Phase 7 — Audit events (P2)
+
+**Goal:** Laravel events for conversion audit trails without coupling logging to the converter.
+
+### money-converter
+
+| # | Task | Detail |
+|---|------|--------|
+| 7.1 | `ConversionPerformed` event | Input context + `MoneyConversionResult`; config gate; one event per bulk item |
+
+**Exit criteria:** All successful conversion paths dispatch when enabled; listeners documented in README.
+
+---
+
 ## Package responsibility matrix
 
 | Concern | money-converter | exchange-rates |
@@ -267,8 +281,9 @@ After this plan is executed, a developer should be able to:
 | **Phase 4** | Architecture & tests | 3–5 days |
 | **Phase 5** | Advanced (as needed) | backlog |
 | **Phase 6** | Options ergonomics & CI | 1–2 days |
+| **Phase 7** | Audit events | 1 day |
 
-Phases 1–3 can ship as **money-converter v0.6.0** with **exchange-rates v0.8.2** (doc/test patch). Phase 4 targets **v0.7.0**. Phase 5 is **v0.8.0+**. Phase 6 targets **v0.11.0**.
+Phases 1–3 can ship as **money-converter v0.6.0** with **exchange-rates v0.8.2** (doc/test patch). Phase 4 targets **v0.7.0**. Phase 5 is **v0.8.0+**. Phase 6 targets **v0.11.0**. Phase 7 targets **v0.12.0**.
 
 ---
 
@@ -293,6 +308,7 @@ The following items from this plan should be tracked in **exchange-rates** (copy
 - [x] 6.3 — Config defaults and specialized-method options tests
 - [x] 6.4 — Phase 6 documentation
 - [x] 6.5 — `composer.lock` for CI
+- [x] 7.1 — `ConversionPerformed` audit event
 
 ---
 
@@ -313,6 +329,7 @@ Record choices here as work proceeds.
 | 2026-06-30 | MoneyConverterOptions DTO | Immutable options object + `withOptions()`; clone-on-fluent retained; fluent API unchanged |
 | 2026-06-30 | Bulk bounding BC guard removed | Direct `getBulkBoundingHistoricalRates()` call; requires exchange-rates `^0.9.0` |
 | 2026-06-30 | Phase 6 complete | Config `default_options`; options on all convert methods; composer.lock for CI |
+| 2026-06-30 | Phase 7 complete | `ConversionPerformed` event with config gate; one event per bulk item |
 | | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail`; `MoneyConverterOptions` added for explicit per-call config |
 
 ---
