@@ -1,3 +1,5 @@
 <?php
 
-uses(BrightCreations\MoneyConverter\Tests\TestCase::class)->in('Unit');
+use BrightCreations\MoneyConverter\Tests\TestCase;
+
+uses(TestCase::class)->in('Unit');

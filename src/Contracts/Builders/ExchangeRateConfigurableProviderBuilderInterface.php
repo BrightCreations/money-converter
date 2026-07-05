@@ -9,8 +9,6 @@ interface ExchangeRateConfigurableProviderBuilderInterface extends ExchangeRateP
 {
     /**
      * Build the exchange rate provider.
-     *
-     * @return ConfigurableProvider
      */
     public function build(): ConfigurableProvider;
 }

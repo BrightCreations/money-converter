@@ -1,7 +1,7 @@
 <?php
 
-use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
 use Brick\Math\RoundingMode;
+use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
 
 return [
 
@@ -28,6 +28,10 @@ return [
     | This controls how Brick\Money will round values when the result of a
     | conversion has more decimal places than the currency scale allows.
     | The default is to round down (truncate) which favors the payer.
+    |
+    | Intermediate cross-rate and interpolation math uses HALF_UP at 10 decimal
+    | places to align with brightcreations/exchange-rates. This setting applies
+    | only to the final conversion into minor currency units.
     |
     | Available modes: RoundingMode::UP, ::DOWN, ::CEILING, ::FLOOR,
     | ::HALF_UP, ::HALF_DOWN, ::HALF_EVEN, ::UNNECESSARY

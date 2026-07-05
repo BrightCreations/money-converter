@@ -9,8 +9,6 @@ interface ExchangeRatePDOProviderBuilderInterface extends ExchangeRateProviderBu
 {
     /**
      * Build the exchange rate provider.
-     *
-     * @return PDOProvider
      */
     public function build(): PDOProvider;
 }

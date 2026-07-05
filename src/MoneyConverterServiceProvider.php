@@ -20,14 +20,14 @@ class MoneyConverterServiceProvider extends ServiceProvider
     {
         // Publish config file
         $this->publishes([
-            __DIR__ . '/../config/money-converter.php' => $this->app->configPath('money-converter.php'),
+            __DIR__.'/../config/money-converter.php' => $this->app->configPath('money-converter.php'),
         ], 'money-converter-config');
     }
 
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/money-converter.php',
+            __DIR__.'/../config/money-converter.php',
             'money-converter'
         );
 

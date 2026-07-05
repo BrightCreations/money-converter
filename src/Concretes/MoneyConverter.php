@@ -22,10 +22,18 @@ final class MoneyConverter implements MoneyConverterInterface
 {
     private const LOG_PREFIX = '[MoneyConverter]';
 
+    private const INTERMEDIATE_RATE_SCALE = 10;
+
+    private const INTERMEDIATE_ROUNDING = RoundingMode::HALF_UP;
+
     private bool $extrapolate;
+
     private bool $interpolate;
+
     private bool $needs_fresh;
+
     private int $on_fail;
+
     private RoundingMode $rounding_mode;
 
     public function __construct(
@@ -34,38 +42,48 @@ final class MoneyConverter implements MoneyConverterInterface
         $this->extrapolate = false;
         $this->interpolate = false;
         $this->needs_fresh = false;
-        $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
+        $this->on_fail = self::ON_FAIL_THROW_EXCEPTION;
         $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::DOWN);
     }
 
     public function extrapolate(bool $extrapolate = true): static
     {
-        $this->extrapolate = $extrapolate;
-        return $this;
+        $clone = clone $this;
+        $clone->extrapolate = $extrapolate;
+
+        return $clone;
     }
 
     public function interpolate(bool $interpolate = true): static
     {
-        $this->interpolate = $interpolate;
-        return $this;
+        $clone = clone $this;
+        $clone->interpolate = $interpolate;
+
+        return $clone;
     }
 
     public function needsFresh(bool $needs_fresh = true): static
     {
-        $this->needs_fresh = $needs_fresh;
-        return $this;
+        $clone = clone $this;
+        $clone->needs_fresh = $needs_fresh;
+
+        return $clone;
     }
 
     public function throwOnFail(): static
     {
-        $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
-        return $this;
+        $clone = clone $this;
+        $clone->on_fail = static::ON_FAIL_THROW_EXCEPTION;
+
+        return $clone;
     }
 
     public function fetchOnFail(): static
     {
-        $this->on_fail = static::ON_FAIL_FETCH_EXCHANGE_RATES;
-        return $this;
+        $clone = clone $this;
+        $clone->on_fail = static::ON_FAIL_FETCH_EXCHANGE_RATES;
+
+        return $clone;
     }
 
     public function isFetchOnFail(): bool
@@ -78,28 +96,32 @@ final class MoneyConverter implements MoneyConverterInterface
         return $this->on_fail === static::ON_FAIL_THROW_EXCEPTION;
     }
 
-    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int {
+    public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int
+    {
         if ($current_currency === $target_currency) {
             return $money;
         }
 
+        $instance = $this;
+
         if ($on_fail !== null) {
-            match ($on_fail) {
-                static::ON_FAIL_FETCH_EXCHANGE_RATES => $this->fetchOnFail(),
-                static::ON_FAIL_THROW_EXCEPTION => $this->throwOnFail(),
-                default => throw new \InvalidArgumentException(self::LOG_PREFIX . ' Invalid on fail value: ' . $on_fail . '. Expected: ' . static::ON_FAIL_FETCH_EXCHANGE_RATES . ' for fetching exchange rates' . ' or ' . static::ON_FAIL_THROW_EXCEPTION . ' for throwing an exception. Got: ' . $on_fail),
+            $instance = clone $this;
+            $instance->on_fail = match ($on_fail) {
+                static::ON_FAIL_FETCH_EXCHANGE_RATES => static::ON_FAIL_FETCH_EXCHANGE_RATES,
+                static::ON_FAIL_THROW_EXCEPTION => static::ON_FAIL_THROW_EXCEPTION,
+                default => throw new \InvalidArgumentException(self::LOG_PREFIX.' Invalid on fail value: '.$on_fail.'. Expected: '.static::ON_FAIL_FETCH_EXCHANGE_RATES.' for fetching exchange rates'.' or '.static::ON_FAIL_THROW_EXCEPTION.' for throwing an exception. Got: '.$on_fail),
             };
         }
 
         if ($date_time) {
-            return $this->convertHistorical($money, $current_currency, $target_currency, $date_time);
+            return $instance->convertHistorical($money, $current_currency, $target_currency, $date_time);
         }
 
-        if ($this->needs_fresh) {
-            return $this->convertFresh($money, $current_currency, $target_currency);
+        if ($instance->needs_fresh) {
+            return $instance->convertFresh($money, $current_currency, $target_currency);
         }
 
-        return $this->convertCurrent($money, $current_currency, $target_currency);
+        return $instance->convertCurrent($money, $current_currency, $target_currency);
     }
 
     public function convertCurrent(int $money, string $current_currency, string $target_currency): int
@@ -117,10 +139,10 @@ final class MoneyConverter implements MoneyConverterInterface
             }
 
             $this->logError($e, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $e->getMessage(), $e);
+            throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency with current exchange rates: '.$e->getMessage(), $e);
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency with current exchange rates: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency with current exchange rates: '.$th->getMessage(), $th);
         }
     }
 
@@ -135,7 +157,7 @@ final class MoneyConverter implements MoneyConverterInterface
             return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using fresh exchange rates: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using fresh exchange rates: '.$th->getMessage(), $th);
         }
     }
 
@@ -150,7 +172,7 @@ final class MoneyConverter implements MoneyConverterInterface
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using historical exchange rates: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using historical exchange rates: '.$th->getMessage(), $th);
         }
     }
 
@@ -165,7 +187,7 @@ final class MoneyConverter implements MoneyConverterInterface
             return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, Carbon::now()->startOfDay());
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
-            throw new MoneyConversionException(self::LOG_PREFIX . " Error while converting currency using today's exchange rates: " . $th->getMessage(), $th);
+            throw new MoneyConversionException(self::LOG_PREFIX." Error while converting currency using today's exchange rates: ".$th->getMessage(), $th);
         }
     }
 
@@ -182,6 +204,7 @@ final class MoneyConverter implements MoneyConverterInterface
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
         ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies([$current_currency, $target_currency]);
+
         // Convert
         return $this->getConvertedMoney($money, $target_currency);
     }
@@ -189,8 +212,8 @@ final class MoneyConverter implements MoneyConverterInterface
     private function getConvertedMoneyUsingHistoricalExchangeRates(Money $money, $target_currency, $date_time): int
     {
         if (! ExchangeRate::isSupportHistoricalExchangeRate()) {
-            Log::error(self::LOG_PREFIX . ' Historical exchange rate is not supported for the exchange rate service');
-            throw new MoneyConversionException(self::LOG_PREFIX . " Historical exchange rate is not supported for the exchange rate service");
+            Log::error(self::LOG_PREFIX.' Historical exchange rate is not supported for the exchange rate service');
+            throw new MoneyConversionException(self::LOG_PREFIX.' Historical exchange rate is not supported for the exchange rate service');
         }
         $current_currency = $money->getCurrency()->getCurrencyCode();
 
@@ -216,10 +239,10 @@ final class MoneyConverter implements MoneyConverterInterface
                     ->getMinorAmount()
                     ->toInt();
             } catch (\Throwable $e) {
-                Log::debug(self::LOG_PREFIX . ' API fetch failed, continuing to next strategy: ' . $e->getMessage());
+                Log::debug(self::LOG_PREFIX.' API fetch failed, continuing to next strategy: '.$e->getMessage());
             }
         } else {
-            Log::debug(self::LOG_PREFIX . ' API fetch is not enabled, continuing to next strategy');
+            Log::debug(self::LOG_PREFIX.' API fetch is not enabled, continuing to next strategy');
         }
 
         // Step 3: Try proxy-currency strategy
@@ -240,8 +263,8 @@ final class MoneyConverter implements MoneyConverterInterface
             $proxyCurrent = BigDecimal::of($proxy_current_rate->exchange_rate);
             $current_target_rate = $proxyTarget->dividedBy(
                 $proxyCurrent,
-                8,
-                $this->rounding_mode
+                self::INTERMEDIATE_RATE_SCALE,
+                self::INTERMEDIATE_ROUNDING
             );
 
             $normalizedRate = $this->normalizeRate($current_target_rate);
@@ -250,7 +273,7 @@ final class MoneyConverter implements MoneyConverterInterface
                 ->getMinorAmount()
                 ->toInt();
         } catch (\Throwable $e) {
-            Log::debug(self::LOG_PREFIX . ' Proxy-currency strategy failed, continuing to next strategy: ' . $e->getMessage());
+            Log::debug(self::LOG_PREFIX.' Proxy-currency strategy failed, continuing to next strategy: '.$e->getMessage());
         }
 
         // Step 4: Try interpolation (guarded by flag)
@@ -261,7 +284,7 @@ final class MoneyConverter implements MoneyConverterInterface
                     return $result;
                 }
             } catch (\Throwable $e) {
-                Log::debug(self::LOG_PREFIX . ' Interpolation failed, continuing to next strategy: ' . $e->getMessage());
+                Log::debug(self::LOG_PREFIX.' Interpolation failed, continuing to next strategy: '.$e->getMessage());
             }
         }
 
@@ -273,12 +296,12 @@ final class MoneyConverter implements MoneyConverterInterface
                     return $result;
                 }
             } catch (\Throwable $e) {
-                Log::debug(self::LOG_PREFIX . ' Extrapolation failed, continuing to next strategy: ' . $e->getMessage());
+                Log::debug(self::LOG_PREFIX.' Extrapolation failed, continuing to next strategy: '.$e->getMessage());
             }
         }
 
         // All strategies failed
-        throw new MoneyConversionException(self::LOG_PREFIX . " Unable to find or compute exchange rate for {$current_currency} to {$target_currency} on {$date_time->toDateString()}");
+        throw new MoneyConversionException(self::LOG_PREFIX." Unable to find or compute exchange rate for {$current_currency} to {$target_currency} on {$date_time->toDateString()}");
     }
 
     /**
@@ -292,7 +315,8 @@ final class MoneyConverter implements MoneyConverterInterface
 
         // Need exactly two distinct records for interpolation
         if ($boundingRates->count() !== 2) {
-            Log::debug(self::LOG_PREFIX . ' Interpolation requires exactly 2 bounding rates, got: ' . $boundingRates->count());
+            Log::debug(self::LOG_PREFIX.' Interpolation requires exactly 2 bounding rates, got: '.$boundingRates->count());
+
             return null;
         }
 
@@ -311,16 +335,17 @@ final class MoneyConverter implements MoneyConverterInterface
 
         // Guard against division by zero
         if ($T == 0) {
-            Log::debug(self::LOG_PREFIX . ' Interpolation failed: time difference between bounds is zero');
+            Log::debug(self::LOG_PREFIX.' Interpolation failed: time difference between bounds is zero');
+
             return null;
         }
 
         // Compute interpolation: rate = r1 + ( (t / T) * (r2 - r1) )
-        $fraction = BigDecimal::of($t)->dividedBy(BigDecimal::of($T), 16, $this->rounding_mode);
+        $fraction = BigDecimal::of($t)->dividedBy(BigDecimal::of($T), 16, self::INTERMEDIATE_ROUNDING);
         $rateDiff = $r2->minus($r1);
         $interpolatedRate = $r1->plus($fraction->multipliedBy($rateDiff));
 
-        Log::info(self::LOG_PREFIX . " Interpolated rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$interpolatedRate} (between {$t1->toDateString()} @ {$r1} and {$t2->toDateString()} @ {$r2})");
+        Log::info(self::LOG_PREFIX." Interpolated rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$interpolatedRate} (between {$t1->toDateString()} @ {$r1} and {$t2->toDateString()} @ {$r2})");
 
         return $money->multipliedBy($interpolatedRate, $this->rounding_mode)
             ->getMinorAmount()
@@ -342,7 +367,7 @@ final class MoneyConverter implements MoneyConverterInterface
 
         if ($previous && ! $next) {
             $rate = $this->normalizeRate($previous->exchange_rate);
-            Log::info(self::LOG_PREFIX . " Extrapolated (nearest previous) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
+            Log::info(self::LOG_PREFIX." Extrapolated (nearest previous) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
 
             return $money->multipliedBy($rate, $this->rounding_mode)
                 ->getMinorAmount()
@@ -351,22 +376,20 @@ final class MoneyConverter implements MoneyConverterInterface
 
         if ($next && ! $previous) {
             $rate = $this->normalizeRate($next->exchange_rate);
-            Log::info(self::LOG_PREFIX . " Extrapolated (nearest next) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
+            Log::info(self::LOG_PREFIX." Extrapolated (nearest next) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
 
             return $money->multipliedBy($rate, $this->rounding_mode)
                 ->getMinorAmount()
                 ->toInt();
         }
 
-        Log::debug(self::LOG_PREFIX . ' Extrapolation skipped: requires exactly one of previous/next bounds');
+        Log::debug(self::LOG_PREFIX.' Extrapolation skipped: requires exactly one of previous/next bounds');
 
         return null;
     }
 
     /**
      * Normalize an exchange rate to a fixed scale using the configured rounding mode.
-     *
-     * @param mixed $rate
      */
     private function normalizeRate(mixed $rate): BigDecimal
     {
@@ -377,9 +400,9 @@ final class MoneyConverter implements MoneyConverterInterface
 
     private function logError(\Throwable $th, array $func_args, string $method_name): void
     {
-        Log::error(self::LOG_PREFIX . ' Error: ' . $th->getMessage() . ' in ' . $th->getFile() . ' on line ' . $th->getLine() . ' in method ' . $method_name);
-        Log::error(self::LOG_PREFIX . ' Method args: ' . json_encode($func_args));
-        Log::error(self::LOG_PREFIX . ' Exception class: ' . get_class($th));
-        Log::debug(self::LOG_PREFIX . ' Trace: ' . $th->getTraceAsString());
+        Log::error(self::LOG_PREFIX.' Error: '.$th->getMessage().' in '.$th->getFile().' on line '.$th->getLine().' in method '.$method_name);
+        Log::error(self::LOG_PREFIX.' Method args: '.json_encode($func_args));
+        Log::error(self::LOG_PREFIX.' Exception class: '.get_class($th));
+        Log::debug(self::LOG_PREFIX.' Trace: '.$th->getTraceAsString());
     }
 }

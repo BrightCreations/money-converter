@@ -265,8 +265,8 @@ The following items from this plan should be tracked in **exchange-rates** (copy
 - [x] 3.8 — “Consuming with money-converter” README section
 - [x] 3.9 — Sync repository docs
 - [x] 3.10 — money-converter example in docs
-- [ ] 4.5 — Test fixture helpers
-- [ ] 4.6 — Date-only vs datetime documentation
+- [x] 4.5 — Test fixture helpers
+- [x] 4.6 — Date-only vs datetime documentation
 - [ ] 5.5 — Bulk bounding helper (if needed)
 - [ ] 5.6 — Provider capability interface (if needed)
 
@@ -283,7 +283,8 @@ Record choices here as work proceeds.
 | 2026-06-30 | Pin exchange-rates `^0.8.0` | `getBoundingHistoricalRates` required for interpolation |
 | 2026-06-30 | Phase 3 complete | money-converter README integration guide; exchange-rates consumer docs; composer pins ER ^0.8.0 |
 | 2026-06-30 | Extrapolation strategy | Nearest-neighbour via `getPreviousHistoricalRate` / `getNextHistoricalRate` |
-| | Singleton fix approach TBD | options DTO preferred; evaluate BC impact during Phase 4 |
+| 2026-06-30 | Phase 4 complete (no release) | Clone-on-fluent for singleton safety; HALF_UP @ 10dp intermediate math; expanded Pest suite + CI; exchange-rates seed trait + date semantics docs |
+| | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail` (no `MoneyConverterOptions` DTO in this phase) |
 
 ---
 

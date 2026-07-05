@@ -165,7 +165,7 @@ $eurCents = MoneyConverter::fetchOnFail()
     ->convertHistorical(10000, 'USD', 'EUR', now()->subDays(30)->startOfDay());
 ```
 
-> **Note:** `MoneyConverter` is registered as a **singleton** with mutable fluent state. Chaining `fetchOnFail()`, `extrapolate()`, etc. affects subsequent calls on the same instance. Prefer resolving a fresh instance or resetting flags when switching behaviour in the same request. (A dedicated fix is planned for a future release.)
+> **Note:** `MoneyConverter` is registered as a **singleton**, but fluent methods (`fetchOnFail()`, `extrapolate()`, `interpolate()`, etc.) return a **new configured instance** and do not mutate the shared singleton. The optional `$on_fail` argument on `convert()` is also scoped to that call only.
 
 ## API reference
 
@@ -183,11 +183,11 @@ $eurCents = MoneyConverter::fetchOnFail()
 
 | Method | Description |
 |--------|-------------|
-| `extrapolate(bool $enable = true)` | Nearest-neighbour rate when target is outside stored date range |
-| `interpolate(bool $enable = true)` | Linear interpolation between two bounding historical rates |
-| `needsFresh(bool $enable = true)` | Route `convert()` without a date through `convertFresh()` |
-| `throwOnFail()` | Throw on conversion failure (default) |
-| `fetchOnFail()` | Fetch rates from API on failure where the provider supports it |
+| `extrapolate(bool $enable = true)` | Nearest-neighbour rate when target is outside stored date range; returns a new instance |
+| `interpolate(bool $enable = true)` | Linear interpolation between two bounding historical rates; returns a new instance |
+| `needsFresh(bool $enable = true)` | Route `convert()` without a date through `convertFresh()`; returns a new instance |
+| `throwOnFail()` | Throw on conversion failure (default); returns a new instance |
+| `fetchOnFail()` | Fetch rates from API on failure where the provider supports it; returns a new instance |
 | `isThrowOnFail()` / `isFetchOnFail()` | Inspect current failure mode |
 
 ### Constants
