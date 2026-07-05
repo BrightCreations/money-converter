@@ -287,6 +287,7 @@ Record choices here as work proceeds.
 | 2026-06-30 | Phase 5 complete (no release) | Configurable rates in config; convertBulk/convertWithResult; supportsHistoricalApiFetch; Laravel 10+ only; 5.5 bulk bounding deferred |
 | 2026-06-30 | Post-Phase 5 backlog | `getBulkBoundingHistoricalRates` in exchange-rates; bulk interpolate prefetch; fetchOnFail API mock test; pin ER ^0.8.8 |
 | 2026-06-30 | MoneyConverterOptions DTO | Immutable options object + `withOptions()`; clone-on-fluent retained; fluent API unchanged |
+| 2026-06-30 | Bulk bounding BC guard removed | Direct `getBulkBoundingHistoricalRates()` call; requires exchange-rates `^0.9.0` |
 | | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail`; `MoneyConverterOptions` added for explicit per-call config |
 
 ---

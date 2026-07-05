@@ -192,7 +192,7 @@ final class MoneyConverter implements MoneyConverterInterface
                 $boundingDtos[(string) $dto] = $dto;
             }
 
-            if ($boundingDtos !== [] && method_exists(ExchangeRateRepository::getFacadeRoot(), 'getBulkBoundingHistoricalRates')) {
+            if ($boundingDtos !== []) {
                 $boundingCache = ExchangeRateRepository::getBulkBoundingHistoricalRates(array_values($boundingDtos));
             }
         }
