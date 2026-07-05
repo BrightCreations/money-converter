@@ -262,9 +262,9 @@ The following items from this plan should be tracked in **exchange-rates** (copy
 - [x] 1.8 — Bounding repository tests
 - [x] 2.6 — Provider historical capability table
 - [x] 2.7 — Optional nearest-rate helper (skipped — nearest-neighbour uses existing previous/next methods)
-- [ ] 3.8 — “Consuming with money-converter” README section
-- [ ] 3.9 — Sync repository docs
-- [ ] 3.10 — money-converter example in docs
+- [x] 3.8 — “Consuming with money-converter” README section
+- [x] 3.9 — Sync repository docs
+- [x] 3.10 — money-converter example in docs
 - [ ] 4.5 — Test fixture helpers
 - [ ] 4.6 — Date-only vs datetime documentation
 - [ ] 5.5 — Bulk bounding helper (if needed)
@@ -281,7 +281,7 @@ Record choices here as work proceeds.
 | 2026-06-30 | Phase 1 complete | exchange-rates v0.8.2 (facade, docs, tests); money-converter 0.5.2 (pin ER ^0.8.0, brick/math, dead code removal, error fix, CHANGELOG) |
 | 2026-06-30 | money-converter owns interpolation/extrapolation | exchange-rates is data layer; keeps user API in one package |
 | 2026-06-30 | Pin exchange-rates `^0.8.0` | `getBoundingHistoricalRates` required for interpolation |
-| 2026-06-30 | Phase 2 complete | Nearest-neighbour extrapolation; bulk fresh fetch; docs + tests; exchange-rates v0.8.3 provider table |
+| 2026-06-30 | Phase 3 complete | money-converter README integration guide; exchange-rates consumer docs; composer pins ER ^0.8.0 |
 | 2026-06-30 | Extrapolation strategy | Nearest-neighbour via `getPreviousHistoricalRate` / `getNextHistoricalRate` |
 | | Singleton fix approach TBD | options DTO preferred; evaluate BC impact during Phase 4 |
 

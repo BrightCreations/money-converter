@@ -1,5 +1,6 @@
-## Money Converter Package
-A PHP package for converting money between different currencies.
+# Money Converter
+
+A Laravel package for converting money between currencies using stored exchange rates and [Brick Money](https://github.com/brick/money).
 
 ![Downloads](https://img.shields.io/github/downloads/BrightCreations/money-converter/total)
 ![License](https://img.shields.io/github/license/BrightCreations/money-converter)
@@ -7,98 +8,214 @@ A PHP package for converting money between different currencies.
 ![Stars](https://img.shields.io/github/stars/BrightCreations/money-converter?style=social)
 
 ## Overview
-This package provides a simple and efficient way to convert money between different currencies. It uses a unified interface to fetch exchange rates and perform conversions, making it easy to integrate with various exchange rate services.
 
-## Features
-- Converts money between different currencies
-- Uses a unified interface to fetch exchange rates and perform conversions
-- Supports multiple exchange rate services
-- Throws exceptions for invalid conversions or missing exchange rates
-- Easy to integrate with various frameworks and applications
+`brightcreations/money-converter` converts amounts between currencies in **minor units** (cents). It reads rates from your database (populated by [`brightcreations/exchange-rates`](https://github.com/BrightCreations/exchange-rates)) and supports current, fresh, historical, interpolated, and extrapolated conversions.
+
+## Requirements
+
+| Dependency | Version |
+|------------|---------|
+| PHP | `>=8.1` |
+| Laravel | `10`, `11`, or `12` (database component) |
+| [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates) | `^0.8.0` (v0.8.x and later 0.x releases) |
 
 ## Installation
-To install the Exchange Rates Service package, run the following command in your terminal:
 
 ```bash
-composer require brightcreations/money-converter
+composer require brightcreations/money-converter brightcreations/exchange-rates
+```
+
+Both packages auto-register their service providers.
+
+## Integration guide
+
+Follow these steps to go from zero to a working conversion.
+
+### 1. Publish exchange-rates config and migrations
+
+```bash
+php artisan vendor:publish --tag=exchange-rates-config
+php artisan vendor:publish --tag=exchange-rate-migrations
+php artisan migrate
+```
+
+### 2. Configure exchange-rate API keys
+
+Add provider credentials to `.env`. See the [exchange-rates installation guide](https://github.com/BrightCreations/exchange-rates#-installation) for full details.
+
+```env
+EXCHANGE_RATE_API_TOKEN=your_token
+OPEN_EXCHANGE_RATE_APP_ID=your_app_id
+```
+
+### 3. Publish money-converter config
+
+```bash
+php artisan vendor:publish --tag=money-converter-config
+```
+
+### 4. Populate exchange rates
+
+Load rates into the database using either approach:
+
+```bash
+# Historical backfill (recommended for World Bank or DB-only workflows)
+php artisan exchange-rates:backfill
+```
+
+```php
+// Or fetch current rates for a base currency
+use BrightCreations\ExchangeRates\Facades\ExchangeRate;
+
+ExchangeRate::storeExchangeRates('USD');
+```
+
+### 5. Convert
+
+```php
+use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
+
+$convertedMinor = app(MoneyConverterInterface::class)->convert(10000, 'USD', 'EUR');
+// 10000 USD cents (100.00 USD) → EUR cents
 ```
 
 ## Configuration
-To configure the package, publish the configuration file using the following command:
 
-```bash
-php artisan vendor:publish --provider="BrightCreations\MoneyConverter\MoneyConverterServiceProvider"
-```
+Published to `config/money-converter.php`.
 
-Then, update the `money-converter.php` configuration file to suit your needs.
+| Key | Default | Description |
+|-----|---------|-------------|
+| `default_provider` | PDO builder | Brick `ExchangeRateProvider` used for current/fresh conversion (`ExchangeRateProvidersEnum::PDO`) |
+| `proxy_currency_code` | `USD` | Base currency for historical proxy cross-rates when a direct pair is missing |
+| `rounding_mode` | `RoundingMode::DOWN` | Brick rounding when converting to minor units |
+| `exchange_rates.pdo.table` | `currency_exchange_rates` | Same table written by exchange-rates |
+| `exchange_rates.pdo.column` | `exchange_rate` | Rate column |
+| `exchange_rates.pdo.source_currency_column` | `base_currency_code` | Source currency column |
+| `exchange_rates.pdo.target_currency_column` | `target_currency_code` | Target currency column |
+
+Environment overrides: `EXCHANGE_RATE_DB_TABLE`, `EXCHANGE_RATE_DB_COLUMN`, `EXCHANGE_RATE_DB_SOURCE_CURRENCY_COLUMN`, `EXCHANGE_RATE_DB_TARGET_CURRENCY_COLUMN`.
+
+PDO column names must match the [exchange-rates schema](https://github.com/BrightCreations/exchange-rates).
 
 ## Usage
-To retrieve exchange rates, use the `MoneyConverterInterface`:
+
+### Minor units
+
+All amounts are in **minor units** (cents, pence, etc.):
+
+| Input | Meaning |
+|-------|---------|
+| `10000` with `USD` | 100.00 USD |
+| `5000` with `EUR` | 50.00 EUR |
+
+Same-currency conversion returns the input unchanged.
+
+### Basic conversion
 
 ```php
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
-// Converts 100.00 USD to EUR using the current exchange rate
-$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
+$service = app(MoneyConverterInterface::class);
 
-// Converts 100.00 USD to EUR using the exchange rate of a previous date
-$convertedMinorInt = $service->convert(10000, 'USD', 'EUR', now()->subDays(1));
+// Current rate (from database via PDO provider)
+$eurCents = $service->convert(10000, 'USD', 'EUR');
+
+// Historical rate (pass a date; use startOfDay() for predictable date-only matching)
+$eurCents = $service->convert(10000, 'USD', 'EUR', now()->subDays(7)->startOfDay());
 ```
 
-> **Important Note:**
-> Before using the package, make sure that the tables of the exchange rates are in your database and the names of the tables and columns are reflected in the config as it is.
+## Resolving the service
 
-You can inject the service into a constructor or resolve it using the `resolve` or `app->make` method. Here are examples of each approach:
-
-### Constructor Injection
+### Constructor injection
 
 ```php
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
 
-class SomeClass {
-    private $service;
+class InvoiceService
+{
+    public function __construct(
+        private MoneyConverterInterface $moneyConverter
+    ) {}
 
-    public function __construct(MoneyConverterInterface $service) {
-        $this->service = $service;
-    }
-
-    public function someMethod() {
-        $convertedMinorInt = $this->service->convert(10000, 'USD', 'EUR');
+    public function convertTotal(int $amountCents, string $from, string $to): int
+    {
+        return $this->moneyConverter->convert($amountCents, $from, $to);
     }
 }
 ```
 
-### Using `resolve` Method
+### Container
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
-
 $service = resolve(MoneyConverterInterface::class);
-$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
+// or
+$service = app()->make(MoneyConverterInterface::class);
 ```
 
-### Using `app->make` Method
+### Facade
 
 ```php
-use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
+use BrightCreations\MoneyConverter\Facades\MoneyConverter;
 
-$service = app()->make(MoneyConverterInterface::class);
-$convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
+$eurCents = MoneyConverter::convert(10000, 'USD', 'EUR');
+
+// Fluent options (see API reference)
+$eurCents = MoneyConverter::fetchOnFail()
+    ->interpolate()
+    ->convertHistorical(10000, 'USD', 'EUR', now()->subDays(30)->startOfDay());
+```
+
+> **Note:** `MoneyConverter` is registered as a **singleton** with mutable fluent state. Chaining `fetchOnFail()`, `extrapolate()`, etc. affects subsequent calls on the same instance. Prefer resolving a fresh instance or resetting flags when switching behaviour in the same request. (A dedicated fix is planned for a future release.)
+
+## API reference
+
+### Conversion methods
+
+| Method | Description |
+|--------|-------------|
+| `convert($money, $from, $to, $dateTime = null, $onFail = null)` | Routes to current, fresh, or historical conversion based on date and flags |
+| `convertCurrent($money, $from, $to)` | Uses rates in the database (PDO provider) |
+| `convertFresh($money, $from, $to)` | Fetches fresh rates via exchange-rates, then converts |
+| `convertToday($money, $from, $to)` | Historical conversion at today's `startOfDay()` |
+| `convertHistorical($money, $from, $to, $dateTime)` | Historical fallback chain (see below) |
+
+### Fluent methods
+
+| Method | Description |
+|--------|-------------|
+| `extrapolate(bool $enable = true)` | Nearest-neighbour rate when target is outside stored date range |
+| `interpolate(bool $enable = true)` | Linear interpolation between two bounding historical rates |
+| `needsFresh(bool $enable = true)` | Route `convert()` without a date through `convertFresh()` |
+| `throwOnFail()` | Throw on conversion failure (default) |
+| `fetchOnFail()` | Fetch rates from API on failure where the provider supports it |
+| `isThrowOnFail()` / `isFetchOnFail()` | Inspect current failure mode |
+
+### Constants
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `ON_FAIL_THROW_EXCEPTION` | `1` | Throw `MoneyConversionException` on failure |
+| `ON_FAIL_FETCH_EXCHANGE_RATES` | `2` | Attempt to fetch rates before failing |
+
+Pass as the fifth argument to `convert()` to temporarily set failure mode:
+
+```php
+$service->convert(10000, 'USD', 'EUR', null, MoneyConverterInterface::ON_FAIL_FETCH_EXCHANGE_RATES);
 ```
 
 ## Historical conversion
 
-Historical conversion runs a fallback chain: exact DB lookup, optional API fetch (`fetchOnFail()`), proxy-currency cross-rate, then optional `interpolate()` and `extrapolate()`.
+Historical conversion runs a fallback chain: exact DB lookup → optional API fetch (`fetchOnFail()`) → proxy-currency cross-rate → optional `interpolate()` → optional `extrapolate()`.
 
 ### Datetime semantics
 
-- **Exact lookup** (step 1) matches by **date only** (`whereDate`), not time. Pass `startOfDay()` for predictable results, e.g. `$service->convert(10000, 'USD', 'EUR', now()->subDays(1)->startOfDay())`.
+- **Exact lookup** (step 1) matches by **date only** (`whereDate`), not time. Pass `startOfDay()` for predictable results.
 - **`convertToday()`** already uses `startOfDay()`.
 - **Bounding, interpolation, and extrapolation** use full datetime (`<=` / `>=` on `date_time`).
 
 ### `fetchOnFail()` and providers
 
-When `fetchOnFail()` is set, historical conversion attempts an API fetch after a DB miss. Behaviour depends on your [exchange-rates](https://github.com/BrightCreations/exchange-rates) provider:
+When `fetchOnFail()` is set, historical conversion attempts an API fetch after a DB miss. Behaviour depends on your exchange-rates provider:
 
 | Provider | Auto-fetch on historical miss | Granularity |
 |----------|------------------------------|-------------|
@@ -111,6 +228,8 @@ For World Bank or DB-only setups, run `php artisan exchange-rates:backfill` to p
 ### `interpolate()` and `extrapolate()`
 
 ```php
+use Carbon\Carbon;
+
 // Fill a gap between two stored dates (linear interpolation)
 $service->interpolate()->convertHistorical(10000, 'USD', 'EUR', Carbon::parse('2024-01-08'));
 
@@ -124,18 +243,27 @@ $service->extrapolate()->convertHistorical(10000, 'USD', 'EUR', Carbon::parse('2
 - **`interpolate()`** — uses two bounding rates when the target falls strictly between stored dates.
 - **`extrapolate()`** — uses the nearest single stored rate when the target is before the earliest or after the latest available date.
 
-## API Documentation
-Coming soon...
+## Exceptions
+
+| Exception | When |
+|-----------|------|
+| `MoneyConversionException` | Conversion fails after all strategies are exhausted, or a non-recoverable error occurs in a convert method |
+| `InvalidArgumentException` | Invalid `$on_fail` value passed to `convert()` (must be `ON_FAIL_THROW_EXCEPTION` or `ON_FAIL_FETCH_EXCHANGE_RATES`) |
+
+`MoneyConversionException` wraps the underlying cause when applicable (e.g. missing rate, unsupported historical provider).
+
+## Rate sourcing
+
+money-converter **does not** fetch exchange rates on its own for day-to-day storage — that is handled by [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates). Install and configure exchange-rates to populate `currency_exchange_rates` and `currency_exchange_rates_history`, then use money-converter to convert.
 
 ## Contributing
-Contributions are welcome! Please submit a pull request or open an issue to report any bugs or suggest new features.
+
+Contributions are welcome. Please open an issue or pull request on GitHub.
 
 ## License
-This package is licensed under the MIT License.
+
+MIT License. See [LICENSE](LICENSE).
 
 ## Author
-Kareem Mohamed - Bright Creations
-Email: [kareem.shaaban@brightcreations.com](mailto:kareem.shaaban@brightcreations.com)
 
-## Version
-0.1.2
+[Kareem Mohamed](mailto:kareem.shaaban@brightcreations.com) — Bright Creations
