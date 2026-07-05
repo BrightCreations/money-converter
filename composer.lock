@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1dc4095fa04eedd73af9edad708b9fa2",
+    "content-hash": "c591c8cb09ebea6657cdf41f51d42e57",
     "packages": [
         {
             "name": "brick/math",
@@ -125,16 +125,16 @@
         },
         {
             "name": "brightcreations/exchange-rates",
-            "version": "v0.8.8",
+            "version": "v0.9.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/BrightCreations/exchange-rates.git",
-                "reference": "0a05ff108d9fc286424b42a4b1f24b818c87242f"
+                "reference": "e87cc1cad3d56500f1522bee2af323437ee2d7b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/BrightCreations/exchange-rates/zipball/0a05ff108d9fc286424b42a4b1f24b818c87242f",
-                "reference": "0a05ff108d9fc286424b42a4b1f24b818c87242f",
+                "url": "https://api.github.com/repos/BrightCreations/exchange-rates/zipball/e87cc1cad3d56500f1522bee2af323437ee2d7b6",
+                "reference": "e87cc1cad3d56500f1522bee2af323437ee2d7b6",
                 "shasum": ""
             },
             "require": {
@@ -184,9 +184,9 @@
             ],
             "support": {
                 "issues": "https://github.com/BrightCreations/exchange-rates/issues",
-                "source": "https://github.com/BrightCreations/exchange-rates/tree/v0.8.8"
+                "source": "https://github.com/BrightCreations/exchange-rates/tree/v0.9.0"
             },
-            "time": "2026-07-05T09:31:46+00:00"
+            "time": "2026-07-05T09:49:42+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
