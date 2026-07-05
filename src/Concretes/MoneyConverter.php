@@ -7,14 +7,21 @@ use Brick\Math\RoundingMode;
 use Brick\Money\CurrencyConverter;
 use Brick\Money\Exception\CurrencyConversionException;
 use Brick\Money\Money;
+use BrightCreations\ExchangeRates\Contracts\ExchangeRateServiceInterface;
+use BrightCreations\ExchangeRates\DTOs\CurrenciesPairDto;
+use BrightCreations\ExchangeRates\DTOs\HistoricalCurrenciesPairDto;
 use BrightCreations\ExchangeRates\Facades\ExchangeRate;
 use BrightCreations\ExchangeRates\Facades\ExchangeRateRepository;
 use BrightCreations\ExchangeRates\Facades\HistoricalExchangeRate;
 use BrightCreations\MoneyConverter\Contracts\MoneyConverterInterface;
+use BrightCreations\MoneyConverter\DTOs\ConversionItem;
+use BrightCreations\MoneyConverter\DTOs\MoneyConversionResult;
+use BrightCreations\MoneyConverter\Enums\ConversionStrategy;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
@@ -98,8 +105,13 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int
     {
+        return $this->convertWithResult($money, $current_currency, $target_currency, $date_time, $on_fail)->amount;
+    }
+
+    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): MoneyConversionResult
+    {
         if ($current_currency === $target_currency) {
-            return $money;
+            return ResolvedConversion::sameCurrency($money)->toResult();
         }
 
         $instance = $this;
@@ -114,14 +126,81 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         if ($date_time) {
-            return $instance->convertHistorical($money, $current_currency, $target_currency, $date_time);
+            return $instance->resolveHistoricalConversion(
+                Money::ofMinor($money, $current_currency),
+                $target_currency,
+                $date_time
+            )->toResult();
         }
 
         if ($instance->needs_fresh) {
-            return $instance->convertFresh($money, $current_currency, $target_currency);
+            return $instance->resolveFreshConversion(
+                Money::ofMinor($money, $current_currency),
+                $target_currency
+            )->toResult();
         }
 
-        return $instance->convertCurrent($money, $current_currency, $target_currency);
+        return $instance->resolveCurrentConversion(
+            Money::ofMinor($money, $current_currency),
+            $target_currency
+        )->toResult();
+    }
+
+    public function convertBulk(array $items): array
+    {
+        return array_map(
+            fn (MoneyConversionResult $result) => $result->amount,
+            $this->convertBulkWithResult($items)
+        );
+    }
+
+    public function convertBulkWithResult(array $items): array
+    {
+        if ($items === []) {
+            return [];
+        }
+
+        if ($this->needs_fresh) {
+            $currencies = [];
+            foreach ($items as $item) {
+                if ($item->from !== $item->to) {
+                    $currencies[] = $item->from;
+                    $currencies[] = $item->to;
+                }
+            }
+
+            if ($currencies !== []) {
+                ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies(array_values(array_unique($currencies)));
+            }
+        }
+
+        $currentPairDtos = [];
+        $historicalPairDtos = [];
+
+        foreach ($items as $item) {
+            if ($item->from === $item->to || $this->needs_fresh) {
+                continue;
+            }
+
+            if ($item->date === null) {
+                $currentPairDtos[(string) new CurrenciesPairDto($item->from, $item->to)] = new CurrenciesPairDto($item->from, $item->to);
+            } else {
+                $historicalPairDtos[(string) new HistoricalCurrenciesPairDto($item->from, $item->to, $item->date)] = new HistoricalCurrenciesPairDto($item->from, $item->to, $item->date);
+            }
+        }
+
+        $currentRates = $currentPairDtos === []
+            ? collect()
+            : ExchangeRateRepository::getBulkExchangeRate(array_values($currentPairDtos));
+
+        $historicalRates = $historicalPairDtos === []
+            ? collect()
+            : ExchangeRateRepository::getBulkHistoricalExchangeRate(array_values($historicalPairDtos));
+
+        return array_map(
+            fn (ConversionItem $item) => $this->resolveBulkItem($item, $currentRates, $historicalRates)->toResult(),
+            $items
+        );
     }
 
     public function convertCurrent(int $money, string $current_currency, string $target_currency): int
@@ -135,7 +214,7 @@ final class MoneyConverter implements MoneyConverterInterface
             return $this->getConvertedMoney($money, $target_currency);
         } catch (CurrencyConversionException $e) {
             if ($this->isFetchOnFail()) {
-                return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
+                return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
             }
 
             $this->logError($e, func_get_args(), __METHOD__);
@@ -154,7 +233,7 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
+            return $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency)->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using fresh exchange rates: '.$th->getMessage(), $th);
@@ -169,7 +248,7 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, $date_time);
+            return $this->resolveHistoricalConversion($money, $target_currency, $date_time)->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX.' Error while converting currency using historical exchange rates: '.$th->getMessage(), $th);
@@ -184,10 +263,104 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $money = Money::ofMinor($money, $current_currency);
         try {
-            return $this->getConvertedMoneyUsingHistoricalExchangeRates($money, $target_currency, Carbon::now()->startOfDay());
+            return $this->resolveHistoricalConversion($money, $target_currency, Carbon::now()->startOfDay())->amount;
         } catch (\Throwable $th) {
             $this->logError($th, func_get_args(), __METHOD__);
             throw new MoneyConversionException(self::LOG_PREFIX." Error while converting currency using today's exchange rates: ".$th->getMessage(), $th);
+        }
+    }
+
+    private function resolveBulkItem(ConversionItem $item, Collection $currentRates, Collection $historicalRates): ResolvedConversion
+    {
+        if ($item->from === $item->to) {
+            return ResolvedConversion::sameCurrency($item->amount);
+        }
+
+        $money = Money::ofMinor($item->amount, $item->from);
+
+        if (! $this->needs_fresh && $item->date === null) {
+            $pairKey = $item->from.'_'.$item->to;
+            $prefetched = $currentRates->get($pairKey)?->first();
+
+            if ($prefetched !== null) {
+                return ResolvedConversion::fromRate(
+                    $money,
+                    $prefetched->exchange_rate,
+                    ConversionStrategy::ExactDb,
+                    $prefetched->provider,
+                    $this->rounding_mode,
+                );
+            }
+        }
+
+        if (! $this->needs_fresh && $item->date !== null) {
+            $prefetched = $historicalRates
+                ->get($item->from)
+                ?->get($item->to)
+                ?->get($item->date->format('Y-m-d'))
+                ?->first();
+
+            if ($prefetched !== null) {
+                return ResolvedConversion::fromRate(
+                    $money,
+                    $prefetched->exchange_rate,
+                    ConversionStrategy::ExactDb,
+                    $prefetched->provider,
+                    $this->rounding_mode,
+                );
+            }
+        }
+
+        if ($item->date !== null) {
+            return $this->resolveHistoricalConversion($money, $item->to, $item->date);
+        }
+
+        if ($this->needs_fresh) {
+            return $this->resolveFreshConversion($money, $item->to);
+        }
+
+        return $this->resolveCurrentConversion($money, $item->to);
+    }
+
+    private function resolveCurrentConversion(Money $money, string $target_currency): ResolvedConversion
+    {
+        $current_currency = $money->getCurrency()->getCurrencyCode();
+
+        try {
+            $rateModel = ExchangeRateRepository::getExchangeRate($current_currency, $target_currency);
+
+            return ResolvedConversion::fromRate(
+                $money,
+                $rateModel->exchange_rate,
+                ConversionStrategy::ExactDb,
+                $rateModel->provider,
+                $this->rounding_mode,
+            );
+        } catch (ModelNotFoundException) {
+            if ($this->isFetchOnFail()) {
+                return $this->resolveFreshConversion($money, $target_currency);
+            }
+
+            throw new MoneyConversionException(self::LOG_PREFIX." Unable to find exchange rate for {$current_currency} to {$target_currency}");
+        }
+    }
+
+    private function resolveFreshConversion(Money $money, string $target_currency): ResolvedConversion
+    {
+        $resolved = $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
+        $current_currency = $money->getCurrency()->getCurrencyCode();
+
+        try {
+            $rateModel = ExchangeRateRepository::getExchangeRate($current_currency, $target_currency);
+
+            return new ResolvedConversion(
+                $resolved->amount,
+                (string) $rateModel->exchange_rate,
+                ConversionStrategy::Fresh,
+                $rateModel->provider,
+            );
+        } catch (ModelNotFoundException) {
+            return new ResolvedConversion($resolved->amount, $resolved->rate, ConversionStrategy::Fresh);
         }
     }
 
@@ -200,44 +373,63 @@ final class MoneyConverter implements MoneyConverterInterface
         )->getMinorAmount()->toInt();
     }
 
-    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, $target_currency): int
+    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, string $target_currency): ResolvedConversion
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
         ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies([$current_currency, $target_currency]);
 
-        // Convert
-        return $this->getConvertedMoney($money, $target_currency);
+        $amount = $this->getConvertedMoney($money, $target_currency);
+
+        try {
+            $rateModel = ExchangeRateRepository::getExchangeRate($current_currency, $target_currency);
+
+            return new ResolvedConversion(
+                $amount,
+                (string) $rateModel->exchange_rate,
+                ConversionStrategy::Fresh,
+                $rateModel->provider,
+            );
+        } catch (ModelNotFoundException) {
+            return new ResolvedConversion($amount, '0', ConversionStrategy::Fresh);
+        }
     }
 
-    private function getConvertedMoneyUsingHistoricalExchangeRates(Money $money, $target_currency, $date_time): int
+    private function resolveHistoricalConversion(Money $money, string $target_currency, CarbonInterface $date_time): ResolvedConversion
     {
         if (! ExchangeRate::isSupportHistoricalExchangeRate()) {
             Log::error(self::LOG_PREFIX.' Historical exchange rate is not supported for the exchange rate service');
             throw new MoneyConversionException(self::LOG_PREFIX.' Historical exchange rate is not supported for the exchange rate service');
         }
+
         $current_currency = $money->getCurrency()->getCurrencyCode();
 
-        // Step 1: Try exact database lookup
         try {
             $historical_exchange_rate = ExchangeRateRepository::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-            $normalizedRate = $this->normalizeRate($historical_exchange_rate->exchange_rate);
 
-            return $money->multipliedBy($normalizedRate, $this->rounding_mode)
-                ->getMinorAmount()
-                ->toInt();
-        } catch (ModelNotFoundException $e) {
+            return ResolvedConversion::fromRate(
+                $money,
+                $historical_exchange_rate->exchange_rate,
+                ConversionStrategy::ExactDb,
+                $historical_exchange_rate->provider,
+                $this->rounding_mode,
+            );
+        } catch (ModelNotFoundException) {
             // Continue to next step
         }
 
-        // Step 2: Try API fetch (conditional on isFetchOnFail)
         if ($this->isFetchOnFail()) {
+            $this->logIfHistoricalApiFetchUnavailable();
+
             try {
                 $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
-                $normalizedRate = $this->normalizeRate($historicalExchangeRate->exchange_rate);
 
-                return $money->multipliedBy($normalizedRate, $this->rounding_mode)
-                    ->getMinorAmount()
-                    ->toInt();
+                return ResolvedConversion::fromRate(
+                    $money,
+                    $historicalExchangeRate->exchange_rate,
+                    ConversionStrategy::ApiFetch,
+                    $historicalExchangeRate->provider,
+                    $this->rounding_mode,
+                );
             } catch (\Throwable $e) {
                 Log::debug(self::LOG_PREFIX.' API fetch failed, continuing to next strategy: '.$e->getMessage());
             }
@@ -245,15 +437,12 @@ final class MoneyConverter implements MoneyConverterInterface
             Log::debug(self::LOG_PREFIX.' API fetch is not enabled, continuing to next strategy');
         }
 
-        // Step 3: Try proxy-currency strategy
         try {
             $proxy_currency = Config::get('money-converter.proxy_currency_code', 'USD');
 
             if ($this->isFetchOnFail()) {
-                // Fetch if not found in database
                 $proxy_currency_exchange_rates = HistoricalExchangeRate::getHistoricalExchangeRates($proxy_currency, $date_time);
             } else {
-                // Fetch from database directly
                 $proxy_currency_exchange_rates = ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
             }
             $proxy_target_rate = $proxy_currency_exchange_rates->where('target_currency_code', $target_currency)->firstOrFail();
@@ -267,16 +456,17 @@ final class MoneyConverter implements MoneyConverterInterface
                 self::INTERMEDIATE_ROUNDING
             );
 
-            $normalizedRate = $this->normalizeRate($current_target_rate);
-
-            return $money->multipliedBy($normalizedRate, $this->rounding_mode)
-                ->getMinorAmount()
-                ->toInt();
+            return ResolvedConversion::fromRate(
+                $money,
+                $current_target_rate,
+                ConversionStrategy::Proxy,
+                $proxy_target_rate->provider,
+                $this->rounding_mode,
+            );
         } catch (\Throwable $e) {
             Log::debug(self::LOG_PREFIX.' Proxy-currency strategy failed, continuing to next strategy: '.$e->getMessage());
         }
 
-        // Step 4: Try interpolation (guarded by flag)
         if ($this->interpolate) {
             try {
                 $result = $this->tryInterpolation($money, $current_currency, $target_currency, $date_time);
@@ -288,7 +478,6 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        // Step 5: Try extrapolation (guarded by flag)
         if ($this->extrapolate) {
             try {
                 $result = $this->tryExtrapolation($money, $current_currency, $target_currency, $date_time);
@@ -300,20 +489,13 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        // All strategies failed
         throw new MoneyConversionException(self::LOG_PREFIX." Unable to find or compute exchange rate for {$current_currency} to {$target_currency} on {$date_time->toDateString()}");
     }
 
-    /**
-     * Try to compute an exchange rate using linear interpolation between two bounding historical rates.
-     *
-     * @return int|null Returns the converted amount if interpolation succeeds, null otherwise.
-     */
-    private function tryInterpolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?int
+    private function tryInterpolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?ResolvedConversion
     {
         $boundingRates = ExchangeRateRepository::getBoundingHistoricalRates($current_currency, $target_currency, $date_time);
 
-        // Need exactly two distinct records for interpolation
         if ($boundingRates->count() !== 2) {
             Log::debug(self::LOG_PREFIX.' Interpolation requires exactly 2 bounding rates, got: '.$boundingRates->count());
 
@@ -323,44 +505,36 @@ final class MoneyConverter implements MoneyConverterInterface
         $d1 = $boundingRates->first();
         $d2 = $boundingRates->last();
 
-        // Extract dates and rates
         $t1 = $d1->date_time instanceof CarbonInterface ? $d1->date_time : Carbon::parse($d1->date_time);
         $t2 = $d2->date_time instanceof CarbonInterface ? $d2->date_time : Carbon::parse($d2->date_time);
         $r1 = $this->normalizeRate($d1->exchange_rate);
         $r2 = $this->normalizeRate($d2->exchange_rate);
 
-        // Compute time differences in seconds
-        $t = $date_time->diffInSeconds($t1, false); // target_date - d1
-        $T = $t2->diffInSeconds($t1, false); // d2 - d1
+        $t = $date_time->diffInSeconds($t1, false);
+        $T = $t2->diffInSeconds($t1, false);
 
-        // Guard against division by zero
         if ($T == 0) {
             Log::debug(self::LOG_PREFIX.' Interpolation failed: time difference between bounds is zero');
 
             return null;
         }
 
-        // Compute interpolation: rate = r1 + ( (t / T) * (r2 - r1) )
         $fraction = BigDecimal::of($t)->dividedBy(BigDecimal::of($T), 16, self::INTERMEDIATE_ROUNDING);
         $rateDiff = $r2->minus($r1);
         $interpolatedRate = $r1->plus($fraction->multipliedBy($rateDiff));
 
         Log::info(self::LOG_PREFIX." Interpolated rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$interpolatedRate} (between {$t1->toDateString()} @ {$r1} and {$t2->toDateString()} @ {$r2})");
 
-        return $money->multipliedBy($interpolatedRate, $this->rounding_mode)
-            ->getMinorAmount()
-            ->toInt();
+        return ResolvedConversion::fromRate(
+            $money,
+            $interpolatedRate,
+            ConversionStrategy::Interpolate,
+            $d1->provider ?? $d2->provider,
+            $this->rounding_mode,
+        );
     }
 
-    /**
-     * Try to compute an exchange rate using nearest-neighbour extrapolation when the target date is outside the stored range.
-     *
-     * Uses the last known rate on or before the target when the target is after all data,
-     * or the first known rate on or after the target when the target is before all data.
-     *
-     * @return int|null Returns the converted amount if extrapolation succeeds, null otherwise.
-     */
-    private function tryExtrapolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?int
+    private function tryExtrapolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?ResolvedConversion
     {
         $previous = ExchangeRateRepository::getPreviousHistoricalRate($current_currency, $target_currency, $date_time);
         $next = ExchangeRateRepository::getNextHistoricalRate($current_currency, $target_currency, $date_time);
@@ -369,18 +543,26 @@ final class MoneyConverter implements MoneyConverterInterface
             $rate = $this->normalizeRate($previous->exchange_rate);
             Log::info(self::LOG_PREFIX." Extrapolated (nearest previous) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
 
-            return $money->multipliedBy($rate, $this->rounding_mode)
-                ->getMinorAmount()
-                ->toInt();
+            return ResolvedConversion::fromRate(
+                $money,
+                $rate,
+                ConversionStrategy::Extrapolate,
+                $previous->provider,
+                $this->rounding_mode,
+            );
         }
 
         if ($next && ! $previous) {
             $rate = $this->normalizeRate($next->exchange_rate);
             Log::info(self::LOG_PREFIX." Extrapolated (nearest next) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
 
-            return $money->multipliedBy($rate, $this->rounding_mode)
-                ->getMinorAmount()
-                ->toInt();
+            return ResolvedConversion::fromRate(
+                $money,
+                $rate,
+                ConversionStrategy::Extrapolate,
+                $next->provider,
+                $this->rounding_mode,
+            );
         }
 
         Log::debug(self::LOG_PREFIX.' Extrapolation skipped: requires exactly one of previous/next bounds');
@@ -388,9 +570,15 @@ final class MoneyConverter implements MoneyConverterInterface
         return null;
     }
 
-    /**
-     * Normalize an exchange rate to a fixed scale using the configured rounding mode.
-     */
+    private function logIfHistoricalApiFetchUnavailable(): void
+    {
+        $service = app(ExchangeRateServiceInterface::class);
+
+        if (method_exists($service, 'supportsHistoricalApiFetch') && ! $service->supportsHistoricalApiFetch()) {
+            Log::debug(self::LOG_PREFIX.' fetchOnFail is enabled but the configured provider does not auto-fetch historical rates on miss');
+        }
+    }
+
     private function normalizeRate(mixed $rate): BigDecimal
     {
         return $rate instanceof BigDecimal

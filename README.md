@@ -92,10 +92,23 @@ Published to `config/money-converter.php`.
 | `exchange_rates.pdo.column` | `exchange_rate` | Rate column |
 | `exchange_rates.pdo.source_currency_column` | `base_currency_code` | Source currency column |
 | `exchange_rates.pdo.target_currency_column` | `target_currency_code` | Target currency column |
+| `exchange_rates.configurable.rates` | see config file | Base → target rate map for local dev (no DB) |
 
 Environment overrides: `EXCHANGE_RATE_DB_TABLE`, `EXCHANGE_RATE_DB_COLUMN`, `EXCHANGE_RATE_DB_SOURCE_CURRENCY_COLUMN`, `EXCHANGE_RATE_DB_TARGET_CURRENCY_COLUMN`.
 
 PDO column names must match the [exchange-rates schema](https://github.com/BrightCreations/exchange-rates).
+
+### Local development without a database
+
+Set `default_provider` to the configurable builder class so Brick reads static rates from config:
+
+```php
+use BrightCreations\MoneyConverter\Enums\ExchangeRateProvidersEnum;
+
+'default_provider' => ExchangeRateProvidersEnum::CONFIGURABLE->value,
+```
+
+Edit `exchange_rates.configurable.rates` in `config/money-converter.php` to add or change pairs. This provider is intended for local/testing only; production should use PDO with exchange-rates populated data.
 
 ## Usage
 
@@ -178,6 +191,11 @@ $eurCents = MoneyConverter::fetchOnFail()
 | `convertFresh($money, $from, $to)` | Fetches fresh rates via exchange-rates, then converts |
 | `convertToday($money, $from, $to)` | Historical conversion at today's `startOfDay()` |
 | `convertHistorical($money, $from, $to, $dateTime)` | Historical fallback chain (see below) |
+| `convertWithResult($money, $from, $to, $dateTime = null, $onFail = null)` | Same routing as `convert()` but returns `MoneyConversionResult` (amount, rate, strategy, provider) |
+| `convertBulk(ConversionItem[] $items)` | Batch conversion; returns `int[]` in input order |
+| `convertBulkWithResult(ConversionItem[] $items)` | Batch conversion with metadata per item |
+
+`ConversionItem` accepts `amount`, `from`, `to`, and optional `date` for historical rows.
 
 ### Fluent methods
 

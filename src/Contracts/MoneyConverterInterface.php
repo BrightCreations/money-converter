@@ -2,6 +2,8 @@
 
 namespace BrightCreations\MoneyConverter\Contracts;
 
+use BrightCreations\MoneyConverter\DTOs\ConversionItem;
+use BrightCreations\MoneyConverter\DTOs\MoneyConversionResult;
 use BrightCreations\MoneyConverter\Exceptions\MoneyConversionException;
 use Carbon\CarbonInterface;
 
@@ -77,6 +79,25 @@ interface MoneyConverterInterface
      * @throws MoneyConversionException conversion fails and on_fail is set to throw.
      */
     public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): int;
+
+    /**
+     * Converts a given amount and returns metadata about the rate and strategy used.
+     *
+     * @throws MoneyConversionException
+     */
+    public function convertWithResult(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null): MoneyConversionResult;
+
+    /**
+     * @param  ConversionItem[]  $items
+     * @return int[]
+     */
+    public function convertBulk(array $items): array;
+
+    /**
+     * @param  ConversionItem[]  $items
+     * @return MoneyConversionResult[]
+     */
+    public function convertBulkWithResult(array $items): array;
 
     /**
      * Converts a given amount of money from one currency to another using the current exchange rate.

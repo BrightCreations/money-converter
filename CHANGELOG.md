@@ -4,6 +4,18 @@ All notable changes to `brightcreations/money-converter` are documented here.
 
 See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap with `brightcreations/exchange-rates`.
 
+## [Unreleased]
+
+### Added
+
+- Config-driven `exchange_rates.configurable.rates` for local development via `ExchangeRateProvidersEnum::CONFIGURABLE`.
+- `convertBulk()` and `convertBulkWithResult()` for batch conversions.
+- `convertWithResult()` returning `MoneyConversionResult` (rate, strategy, provider).
+
+### Changed
+
+- **Breaking:** `illuminate/support` now requires `^10.0` (Laravel 9 no longer supported).
+
 ## [0.6.0]
 
 ### Added
