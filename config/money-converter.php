@@ -33,6 +33,6 @@ return [
     | ::HALF_UP, ::HALF_DOWN, ::HALF_EVEN, ::UNNECESSARY
     |
     */
-    'rounding_mode' => RoundingMode::Down,
+    'rounding_mode' => RoundingMode::DOWN,
 
 ];

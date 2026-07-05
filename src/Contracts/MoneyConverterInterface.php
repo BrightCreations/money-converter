@@ -13,6 +13,11 @@ interface MoneyConverterInterface
     /**
      * Extrapolate the conversion if the exchange rate is not found.
      *
+     * When enabled, uses nearest-neighbour extrapolation for historical conversion when the target
+     * date is outside the stored rate range: the last known rate on or before the target (when the
+     * target is after all data), or the first known rate on or after the target (when before all data).
+     * Does not apply when both bounds exist (use interpolate() for dates between two known rates).
+     *
      * @param bool $extrapolate Whether to extrapolate the conversion if the exchange rate is not found.
      * @return static
      */
@@ -43,6 +48,11 @@ interface MoneyConverterInterface
 
     /**
      * Fetch the exchange rates if the conversion fails.
+     *
+     * When enabled, historical conversion attempts an API fetch on cache miss. Auto-fetch behaviour
+     * depends on the configured exchange-rates provider: OpenExchange and ExchangeRateAPI fetch daily
+     * rates on miss; World Bank is DB-only (yearly data). Pre-populate history with
+     * `php artisan exchange-rates:backfill` when using World Bank or DB-only workflows.
      *
      * @return static
      */
@@ -104,10 +114,13 @@ interface MoneyConverterInterface
     /**
      * Converts a given amount of money from one currency to another using the historical exchange rate.
      *
+     * Exact database lookup matches by date only (ignores time component). Prefer passing
+     * `startOfDay()` for predictable results. Bounding, interpolation, and extrapolation use full datetime.
+     *
      * @param int    $money            Amount of money in minor units (cents).
      * @param string $current_currency Source currency code.
      * @param string $target_currency  Target currency code.
-     * @param CarbonInterface $date_time Date and time for the conversion; defaults to now.
+     * @param CarbonInterface $date_time Date and time for the conversion.
      *
      * @return int Converted amount of money in minor units (cents).
      */

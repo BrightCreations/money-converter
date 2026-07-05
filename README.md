@@ -86,6 +86,44 @@ $service = app()->make(MoneyConverterInterface::class);
 $convertedMinorInt = $service->convert(10000, 'USD', 'EUR');
 ```
 
+## Historical conversion
+
+Historical conversion runs a fallback chain: exact DB lookup, optional API fetch (`fetchOnFail()`), proxy-currency cross-rate, then optional `interpolate()` and `extrapolate()`.
+
+### Datetime semantics
+
+- **Exact lookup** (step 1) matches by **date only** (`whereDate`), not time. Pass `startOfDay()` for predictable results, e.g. `$service->convert(10000, 'USD', 'EUR', now()->subDays(1)->startOfDay())`.
+- **`convertToday()`** already uses `startOfDay()`.
+- **Bounding, interpolation, and extrapolation** use full datetime (`<=` / `>=` on `date_time`).
+
+### `fetchOnFail()` and providers
+
+When `fetchOnFail()` is set, historical conversion attempts an API fetch after a DB miss. Behaviour depends on your [exchange-rates](https://github.com/BrightCreations/exchange-rates) provider:
+
+| Provider | Auto-fetch on historical miss | Granularity |
+|----------|------------------------------|-------------|
+| Open Exchange Rates | Yes | Daily |
+| Exchange Rate API | Yes | Daily |
+| World Bank | No (DB only) | Yearly |
+
+For World Bank or DB-only setups, run `php artisan exchange-rates:backfill` to populate historical data.
+
+### `interpolate()` and `extrapolate()`
+
+```php
+// Fill a gap between two stored dates (linear interpolation)
+$service->interpolate()->convertHistorical(10000, 'USD', 'EUR', Carbon::parse('2024-01-08'));
+
+// Target after latest stored rate (nearest previous rate)
+$service->extrapolate()->convertHistorical(10000, 'USD', 'EUR', Carbon::parse('2024-06-01'));
+
+// Target before earliest stored rate (nearest next rate)
+$service->extrapolate()->convertHistorical(10000, 'USD', 'EUR', Carbon::parse('2024-01-01'));
+```
+
+- **`interpolate()`** — uses two bounding rates when the target falls strictly between stored dates.
+- **`extrapolate()`** — uses the nearest single stored rate when the target is before the earliest or after the latest available date.
+
 ## API Documentation
 Coming soon...
 

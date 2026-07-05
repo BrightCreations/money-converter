@@ -35,7 +35,7 @@ final class MoneyConverter implements MoneyConverterInterface
         $this->interpolate = false;
         $this->needs_fresh = false;
         $this->on_fail = static::ON_FAIL_THROW_EXCEPTION;
-        $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::Down);
+        $this->rounding_mode = Config::get('money-converter.rounding_mode', RoundingMode::DOWN);
     }
 
     public function extrapolate(bool $extrapolate = true): static
@@ -181,10 +181,7 @@ final class MoneyConverter implements MoneyConverterInterface
     private function getConvertedMoneyUsingFreshExchangeRates(Money $money, $target_currency): int
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
-        // Fetch base currency exchange rates
-        ExchangeRate::storeExchangeRates($current_currency);
-        // Fetch target currency exchange rates
-        ExchangeRate::storeExchangeRates($target_currency);
+        ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies([$current_currency, $target_currency]);
         // Convert
         return $this->getConvertedMoney($money, $target_currency);
     }
@@ -268,9 +265,16 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
-        // Step 5: Future extrapolation strategy
+        // Step 5: Try extrapolation (guarded by flag)
         if ($this->extrapolate) {
-            // TODO: implement additional extrapolation strategy beyond proxy-currency and interpolation.
+            try {
+                $result = $this->tryExtrapolation($money, $current_currency, $target_currency, $date_time);
+                if ($result !== null) {
+                    return $result;
+                }
+            } catch (\Throwable $e) {
+                Log::debug(self::LOG_PREFIX . ' Extrapolation failed, continuing to next strategy: ' . $e->getMessage());
+            }
         }
 
         // All strategies failed
@@ -321,6 +325,42 @@ final class MoneyConverter implements MoneyConverterInterface
         return $money->multipliedBy($interpolatedRate, $this->rounding_mode)
             ->getMinorAmount()
             ->toInt();
+    }
+
+    /**
+     * Try to compute an exchange rate using nearest-neighbour extrapolation when the target date is outside the stored range.
+     *
+     * Uses the last known rate on or before the target when the target is after all data,
+     * or the first known rate on or after the target when the target is before all data.
+     *
+     * @return int|null Returns the converted amount if extrapolation succeeds, null otherwise.
+     */
+    private function tryExtrapolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?int
+    {
+        $previous = ExchangeRateRepository::getPreviousHistoricalRate($current_currency, $target_currency, $date_time);
+        $next = ExchangeRateRepository::getNextHistoricalRate($current_currency, $target_currency, $date_time);
+
+        if ($previous && ! $next) {
+            $rate = $this->normalizeRate($previous->exchange_rate);
+            Log::info(self::LOG_PREFIX . " Extrapolated (nearest previous) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
+
+            return $money->multipliedBy($rate, $this->rounding_mode)
+                ->getMinorAmount()
+                ->toInt();
+        }
+
+        if ($next && ! $previous) {
+            $rate = $this->normalizeRate($next->exchange_rate);
+            Log::info(self::LOG_PREFIX . " Extrapolated (nearest next) rate for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: {$rate}");
+
+            return $money->multipliedBy($rate, $this->rounding_mode)
+                ->getMinorAmount()
+                ->toInt();
+        }
+
+        Log::debug(self::LOG_PREFIX . ' Extrapolation skipped: requires exactly one of previous/next bounds');
+
+        return null;
     }
 
     /**
