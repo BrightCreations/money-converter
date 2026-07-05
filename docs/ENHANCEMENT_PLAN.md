@@ -267,7 +267,7 @@ The following items from this plan should be tracked in **exchange-rates** (copy
 - [x] 3.10 — money-converter example in docs
 - [x] 4.5 — Test fixture helpers
 - [x] 4.6 — Date-only vs datetime documentation
-- [ ] 5.5 — Bulk bounding helper (skipped — per-pair bounding sufficient for convertBulk v1)
+- [x] 5.5 — Bulk bounding helper (`getBulkBoundingHistoricalRates` + bulk interpolate prefetch)
 - [x] 5.6 — Provider capability interface (if needed)
 
 ---
@@ -285,6 +285,7 @@ Record choices here as work proceeds.
 | 2026-06-30 | Extrapolation strategy | Nearest-neighbour via `getPreviousHistoricalRate` / `getNextHistoricalRate` |
 | 2026-06-30 | Phase 4 complete (no release) | Clone-on-fluent for singleton safety; HALF_UP @ 10dp intermediate math; expanded Pest suite + CI; exchange-rates seed trait + date semantics docs |
 | 2026-06-30 | Phase 5 complete (no release) | Configurable rates in config; convertBulk/convertWithResult; supportsHistoricalApiFetch; Laravel 10+ only; 5.5 bulk bounding deferred |
+| 2026-06-30 | Post-Phase 5 backlog | `getBulkBoundingHistoricalRates` in exchange-rates; bulk interpolate prefetch; fetchOnFail API mock test; pin ER ^0.8.8 |
 | | Singleton fix approach TBD | **Resolved:** clone-on-fluent + call-scoped `$on_fail` (no `MoneyConverterOptions` DTO in this phase) |
 
 ---

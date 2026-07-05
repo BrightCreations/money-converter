@@ -7,7 +7,6 @@ use Brick\Math\RoundingMode;
 use Brick\Money\CurrencyConverter;
 use Brick\Money\Exception\CurrencyConversionException;
 use Brick\Money\Money;
-use BrightCreations\ExchangeRates\Contracts\ExchangeRateServiceInterface;
 use BrightCreations\ExchangeRates\DTOs\CurrenciesPairDto;
 use BrightCreations\ExchangeRates\DTOs\HistoricalCurrenciesPairDto;
 use BrightCreations\ExchangeRates\Facades\ExchangeRate;
@@ -197,8 +196,31 @@ final class MoneyConverter implements MoneyConverterInterface
             ? collect()
             : ExchangeRateRepository::getBulkHistoricalExchangeRate(array_values($historicalPairDtos));
 
+        $boundingCache = collect();
+
+        if ($this->interpolate && $historicalPairDtos !== []) {
+            $boundingDtos = [];
+
+            foreach ($items as $item) {
+                if ($item->from === $item->to || $item->date === null || $this->needs_fresh) {
+                    continue;
+                }
+
+                if ($this->hasExactHistoricalPrefetch($item, $historicalRates)) {
+                    continue;
+                }
+
+                $dto = new HistoricalCurrenciesPairDto($item->from, $item->to, $item->date);
+                $boundingDtos[(string) $dto] = $dto;
+            }
+
+            if ($boundingDtos !== [] && method_exists(ExchangeRateRepository::getFacadeRoot(), 'getBulkBoundingHistoricalRates')) {
+                $boundingCache = ExchangeRateRepository::getBulkBoundingHistoricalRates(array_values($boundingDtos));
+            }
+        }
+
         return array_map(
-            fn (ConversionItem $item) => $this->resolveBulkItem($item, $currentRates, $historicalRates)->toResult(),
+            fn (ConversionItem $item) => $this->resolveBulkItem($item, $currentRates, $historicalRates, $boundingCache)->toResult(),
             $items
         );
     }
@@ -270,7 +292,7 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    private function resolveBulkItem(ConversionItem $item, Collection $currentRates, Collection $historicalRates): ResolvedConversion
+    private function resolveBulkItem(ConversionItem $item, Collection $currentRates, Collection $historicalRates, ?Collection $boundingCache = null): ResolvedConversion
     {
         if ($item->from === $item->to) {
             return ResolvedConversion::sameCurrency($item->amount);
@@ -312,7 +334,7 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         if ($item->date !== null) {
-            return $this->resolveHistoricalConversion($money, $item->to, $item->date);
+            return $this->resolveHistoricalConversion($money, $item->to, $item->date, $boundingCache);
         }
 
         if ($this->needs_fresh) {
@@ -394,7 +416,7 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    private function resolveHistoricalConversion(Money $money, string $target_currency, CarbonInterface $date_time): ResolvedConversion
+    private function resolveHistoricalConversion(Money $money, string $target_currency, CarbonInterface $date_time, ?Collection $boundingCache = null): ResolvedConversion
     {
         if (! ExchangeRate::isSupportHistoricalExchangeRate()) {
             Log::error(self::LOG_PREFIX.' Historical exchange rate is not supported for the exchange rate service');
@@ -418,7 +440,9 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         if ($this->isFetchOnFail()) {
-            $this->logIfHistoricalApiFetchUnavailable();
+            if (! ExchangeRate::supportsHistoricalApiFetch()) {
+                Log::debug(self::LOG_PREFIX.' fetchOnFail is enabled but the configured provider does not auto-fetch historical rates on miss');
+            }
 
             try {
                 $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
@@ -469,7 +493,7 @@ final class MoneyConverter implements MoneyConverterInterface
 
         if ($this->interpolate) {
             try {
-                $result = $this->tryInterpolation($money, $current_currency, $target_currency, $date_time);
+                $result = $this->tryInterpolation($money, $current_currency, $target_currency, $date_time, $boundingCache);
                 if ($result !== null) {
                     return $result;
                 }
@@ -492,9 +516,15 @@ final class MoneyConverter implements MoneyConverterInterface
         throw new MoneyConversionException(self::LOG_PREFIX." Unable to find or compute exchange rate for {$current_currency} to {$target_currency} on {$date_time->toDateString()}");
     }
 
-    private function tryInterpolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time): ?ResolvedConversion
+    private function tryInterpolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?Collection $boundingCache = null): ?ResolvedConversion
     {
-        $boundingRates = ExchangeRateRepository::getBoundingHistoricalRates($current_currency, $target_currency, $date_time);
+        $cacheKey = $current_currency.'_'.$target_currency.'_'.$date_time->format('Y-m-d');
+
+        if ($boundingCache !== null && $boundingCache->has($cacheKey)) {
+            $boundingRates = $boundingCache->get($cacheKey);
+        } else {
+            $boundingRates = ExchangeRateRepository::getBoundingHistoricalRates($current_currency, $target_currency, $date_time);
+        }
 
         if ($boundingRates->count() !== 2) {
             Log::debug(self::LOG_PREFIX.' Interpolation requires exactly 2 bounding rates, got: '.$boundingRates->count());
@@ -570,13 +600,17 @@ final class MoneyConverter implements MoneyConverterInterface
         return null;
     }
 
-    private function logIfHistoricalApiFetchUnavailable(): void
+    private function hasExactHistoricalPrefetch(ConversionItem $item, Collection $historicalRates): bool
     {
-        $service = app(ExchangeRateServiceInterface::class);
-
-        if (method_exists($service, 'supportsHistoricalApiFetch') && ! $service->supportsHistoricalApiFetch()) {
-            Log::debug(self::LOG_PREFIX.' fetchOnFail is enabled but the configured provider does not auto-fetch historical rates on miss');
+        if ($item->date === null) {
+            return false;
         }
+
+        return $historicalRates
+            ->get($item->from)
+            ?->get($item->to)
+            ?->get($item->date->format('Y-m-d'))
+            ?->first() !== null;
     }
 
     private function normalizeRate(mixed $rate): BigDecimal

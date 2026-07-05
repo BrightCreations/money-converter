@@ -11,10 +11,13 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 - Config-driven `exchange_rates.configurable.rates` for local development via `ExchangeRateProvidersEnum::CONFIGURABLE`.
 - `convertBulk()` and `convertBulkWithResult()` for batch conversions.
 - `convertWithResult()` returning `MoneyConversionResult` (rate, strategy, provider).
+- Bulk historical interpolation prefetch via `getBulkBoundingHistoricalRates` (requires exchange-rates `^0.8.8`).
+- `MoneyConverterFetchOnFailTest` covering API fetch fallback when the database has no exact historical rate.
 
 ### Changed
 
 - **Breaking:** `illuminate/support` now requires `^10.0` (Laravel 9 no longer supported).
+- Pin `brightcreations/exchange-rates` to `^0.8.8`; use `ExchangeRate::supportsHistoricalApiFetch()` directly (no `method_exists` guard).
 
 ## [0.6.0]
 

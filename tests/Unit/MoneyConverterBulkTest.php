@@ -60,3 +60,21 @@ it('falls through to interpolation for historical bulk items when exact rate is 
     expect($results[0])->toBeGreaterThan(9000);
     expect($results[0])->toBeLessThan(9500);
 });
+
+it('interpolates multiple historical dates on the same pair in one bulk call', function () {
+    $this->seedHistoricalRate('USD', 'EUR', 0.90, Carbon::parse('2024-01-01'));
+    $this->seedHistoricalRate('USD', 'EUR', 0.95, Carbon::parse('2024-01-15'));
+
+    $results = $this->converter
+        ->interpolate()
+        ->convertBulk([
+            new ConversionItem(10000, 'USD', 'EUR', Carbon::parse('2024-01-05')),
+            new ConversionItem(10000, 'USD', 'EUR', Carbon::parse('2024-01-08')),
+            new ConversionItem(10000, 'USD', 'EUR', Carbon::parse('2024-01-10')),
+        ]);
+
+    foreach ($results as $amount) {
+        expect($amount)->toBeGreaterThan(9000);
+        expect($amount)->toBeLessThan(9500);
+    }
+});
