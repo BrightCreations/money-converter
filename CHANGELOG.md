@@ -6,6 +6,13 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 
 ## [Unreleased]
 
+### Changed
+
+- Support Laravel 13 (`illuminate/*` `^13.0`; needs PHP 8.3+). Laravel 10–12 still supported.
+- Accept `brick/math` `^0.13.0` and `^0.14.0` (Laravel 13 needs `^0.14.2`). Still capped below 1.0, which stops accepting floats.
+- Accept `brightcreations/exchange-rates` `^0.10.0` and `^0.11.0`. Laravel 13 needs exchange-rates `^0.11.0`.
+- CI runs PHP 8.2–8.4 on Laravel 12 and PHP 8.3–8.4 on Laravel 13. `composer.lock` is resolved on PHP 8.2.
+
 ## [0.12.0] - 2026-07-05
 
 ### Added

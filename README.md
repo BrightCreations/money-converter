@@ -16,8 +16,8 @@ A Laravel package for converting money between currencies using stored exchange 
 | Dependency | Version |
 |------------|---------|
 | PHP | `>=8.1` |
-| Laravel | `10`, `11`, or `12` (database component) |
-| [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates) | `^0.9.0` |
+| Laravel | `10`, `11`, `12`, or `13` (database component; Laravel 13 needs PHP 8.3+) |
+| [brightcreations/exchange-rates](https://github.com/BrightCreations/exchange-rates) | `^0.9.0`, `^0.10.0`, or `^0.11.0` (Laravel 13 needs `^0.11.0`) |
 
 ## Installation
 
