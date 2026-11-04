@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a6455e6792fe78d42085d1010d137625",
+    "content-hash": "9e8884c7f6744476997c486b0f1da349",
     "packages": [
         {
             "name": "brick/math",
@@ -125,32 +125,33 @@
         },
         {
             "name": "brightcreations/exchange-rates",
-            "version": "v0.10.0",
+            "version": "v0.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/BrightCreations/exchange-rates.git",
-                "reference": "090c72a93c1bb643c895e90b4e4249707662365d"
+                "reference": "29dc327c13c665e78308880d53c75a82e7c8e857"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/BrightCreations/exchange-rates/zipball/090c72a93c1bb643c895e90b4e4249707662365d",
-                "reference": "090c72a93c1bb643c895e90b4e4249707662365d",
+                "url": "https://api.github.com/repos/BrightCreations/exchange-rates/zipball/29dc327c13c665e78308880d53c75a82e7c8e857",
+                "reference": "29dc327c13c665e78308880d53c75a82e7c8e857",
                 "shasum": ""
             },
             "require": {
-                "guzzlehttp/guzzle": "^7.9",
-                "illuminate/console": "^10.0 || ^11.0 || ^12.0",
-                "illuminate/database": "^10.0 || ^11.0 || ^12.0",
-                "illuminate/http": "^10.0 || ^11.0 || ^12.0",
-                "illuminate/support": "^9.0|^10.0|^11.0|^12.0",
+                "brick/math": ">=0.11 <2.0",
+                "guzzlehttp/guzzle": "^7.9 || ^8.0",
+                "illuminate/console": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+                "illuminate/database": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+                "illuminate/http": "^10.0 || ^11.0 || ^12.0 || ^13.0",
+                "illuminate/support": "^9.0|^10.0|^11.0|^12.0|^13.0",
                 "php": ">=8.1",
                 "pragmarx/countries": "^1.0"
             },
             "require-dev": {
                 "laravel/pint": "^1.0 || ^1.25",
-                "orchestra/testbench": "^10.0",
-                "pestphp/pest": "^3.0",
-                "pestphp/pest-plugin-laravel": "^3.0",
+                "orchestra/testbench": "^10.0 || ^11.0",
+                "pestphp/pest": "^3.0 || ^4.0",
+                "pestphp/pest-plugin-laravel": "^3.0 || ^4.0",
                 "vlucas/phpdotenv": "^5.6"
             },
             "type": "library",
@@ -184,9 +185,9 @@
             ],
             "support": {
                 "issues": "https://github.com/BrightCreations/exchange-rates/issues",
-                "source": "https://github.com/BrightCreations/exchange-rates/tree/v0.10.0"
+                "source": "https://github.com/BrightCreations/exchange-rates/tree/v0.12.0"
             },
-            "time": "2026-08-11T07:54:08+00:00"
+            "time": "2026-11-04T14:33:00+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -10283,12 +10284,12 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.1"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
 }
