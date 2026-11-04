@@ -37,6 +37,15 @@ final class MoneyConverter implements MoneyConverterInterface
 
     private RoundingMode $rounding_mode;
 
+    /**
+     * Historical API fetches ("{base}|{Y-m-d}") that already failed during the current bulk
+     * conversion, so later items with the same base and date do not repeat them. Null outside a
+     * bulk conversion: the container singleton never carries state between calls.
+     *
+     * @var array<string, true>|null
+     */
+    private ?array $failedHistoricalFetches = null;
+
     public function __construct(
         private readonly CurrencyConverter $converter
     ) {
@@ -147,14 +156,15 @@ final class MoneyConverter implements MoneyConverterInterface
             return [];
         }
 
-        $instance = $options !== null ? $this->withOptions($options) : $this;
+        $instance = $this->withOptions($options ?? $this->options);
+        $instance->failedHistoricalFetches = [];
 
         if ($instance->options->needsFresh) {
+            // Only the source currencies: conversions read the from -> to rates
             $currencies = [];
             foreach ($items as $item) {
                 if ($item->from !== $item->to) {
                     $currencies[] = $item->from;
-                    $currencies[] = $item->to;
                 }
             }
 
@@ -343,7 +353,8 @@ final class MoneyConverter implements MoneyConverterInterface
                 ?->get($item->date->format('Y-m-d'))
                 ?->first();
 
-            if ($prefetched !== null) {
+            // A provisional (period-average) rate goes through the full chain, which may find a better one
+            if ($prefetched !== null && ! $this->isProvisionalRate($prefetched)) {
                 return ResolvedConversion::fromRate(
                     $money,
                     $prefetched->exchange_rate,
@@ -359,7 +370,8 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         if ($this->options->needsFresh) {
-            return $this->resolveFreshConversion($money, $item->to);
+            // convertBulkWithResult() already refreshed every source currency once up front
+            return $this->resolveFreshConversion($money, $item->to, refresh: false);
         }
 
         return $this->resolveCurrentConversion($money, $item->to);
@@ -388,9 +400,12 @@ final class MoneyConverter implements MoneyConverterInterface
         }
     }
 
-    private function resolveFreshConversion(Money $money, string $target_currency): ResolvedConversion
+    /**
+     * @param  bool  $refresh  false when the caller has just refreshed the current currency's rates
+     */
+    private function resolveFreshConversion(Money $money, string $target_currency, bool $refresh = true): ResolvedConversion
     {
-        $resolved = $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency);
+        $resolved = $this->getConvertedMoneyUsingFreshExchangeRates($money, $target_currency, $refresh);
         $current_currency = $money->getCurrency()->getCurrencyCode();
 
         try {
@@ -416,10 +431,14 @@ final class MoneyConverter implements MoneyConverterInterface
         )->getMinorAmount()->toInt();
     }
 
-    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, string $target_currency): ResolvedConversion
+    private function getConvertedMoneyUsingFreshExchangeRates(Money $money, string $target_currency, bool $refresh = true): ResolvedConversion
     {
         $current_currency = $money->getCurrency()->getCurrencyCode();
-        ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies([$current_currency, $target_currency]);
+
+        if ($refresh) {
+            // The conversion reads the current -> target rate, so only the current currency's rates are needed
+            ExchangeRate::storeBulkExchangeRatesForMultipleCurrencies([$current_currency]);
+        }
 
         $amount = $this->getConvertedMoney($money, $target_currency);
 
@@ -446,21 +465,37 @@ final class MoneyConverter implements MoneyConverterInterface
 
         $current_currency = $money->getCurrency()->getCurrencyCode();
 
+        // A provisional rate (a period average such as World Bank's yearly rate) is only a last resort:
+        // it is kept aside while a daily rate, a daily cross-rate or a daily interpolation is looked
+        // for, and used before extrapolating from a single, possibly distant, daily rate.
+        $provisional = null;
+
         try {
             $historical_exchange_rate = ExchangeRateRepository::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
 
-            return ResolvedConversion::fromRate(
+            $resolved = ResolvedConversion::fromRate(
                 $money,
                 $historical_exchange_rate->exchange_rate,
                 ConversionStrategy::ExactDb,
                 $historical_exchange_rate->provider,
                 $this->rounding_mode,
             );
+
+            if (! $this->isProvisionalRate($historical_exchange_rate)) {
+                return $resolved;
+            }
+
+            $provisional = $resolved;
         } catch (ModelNotFoundException) {
             // Continue to next step
         }
 
-        if ($this->isFetchOnFail()) {
+        // No provider has rates for a future date, so fetching one only spends API quota. A stored
+        // provisional rate means the daily providers already failed for this date (they are retried
+        // by exchange-rates:refresh-provisional); fetching would only return it again.
+        $canFetch = $this->isFetchOnFail() && ! $this->isFutureDate($date_time);
+
+        if ($canFetch && $provisional === null && ! $this->historicalFetchFailedEarlier($current_currency, $date_time)) {
             if (! ExchangeRate::supportsHistoricalApiFetch()) {
                 Log::debug(self::LOG_PREFIX.' fetchOnFail is enabled but the configured provider does not auto-fetch historical rates on miss');
             }
@@ -468,16 +503,28 @@ final class MoneyConverter implements MoneyConverterInterface
             try {
                 $historicalExchangeRate = HistoricalExchangeRate::getHistoricalExchangeRate($current_currency, $target_currency, $date_time);
 
-                return ResolvedConversion::fromRate(
+                $resolved = ResolvedConversion::fromRate(
                     $money,
                     $historicalExchangeRate->exchange_rate,
                     ConversionStrategy::ApiFetch,
                     $historicalExchangeRate->provider,
                     $this->rounding_mode,
                 );
+
+                if (! $this->isProvisionalRate($historicalExchangeRate)) {
+                    return $resolved;
+                }
+
+                $provisional = $resolved;
+            } catch (ModelNotFoundException $e) {
+                // The rates were fetched but have no such target: other targets can still be served
+                Log::debug(self::LOG_PREFIX.' API fetch failed, continuing to next strategy: '.$e->getMessage());
             } catch (\Throwable $e) {
+                $this->rememberFailedHistoricalFetch($current_currency, $date_time);
                 Log::debug(self::LOG_PREFIX.' API fetch failed, continuing to next strategy: '.$e->getMessage());
             }
+        } elseif ($this->isFetchOnFail()) {
+            Log::debug(self::LOG_PREFIX.' API fetch skipped (future date, provisional rate stored, or already failed in this bulk conversion), continuing to next strategy');
         } else {
             Log::debug(self::LOG_PREFIX.' API fetch is not enabled, continuing to next strategy');
         }
@@ -485,11 +532,7 @@ final class MoneyConverter implements MoneyConverterInterface
         try {
             $proxy_currency = Config::get('money-converter.proxy_currency_code', 'USD');
 
-            if ($this->isFetchOnFail()) {
-                $proxy_currency_exchange_rates = HistoricalExchangeRate::getHistoricalExchangeRates($proxy_currency, $date_time);
-            } else {
-                $proxy_currency_exchange_rates = ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
-            }
+            $proxy_currency_exchange_rates = $this->getProxyHistoricalExchangeRates($proxy_currency, $date_time, $canFetch);
             $proxy_target_rate = $proxy_currency_exchange_rates->where('target_currency_code', $target_currency)->firstOrFail();
             $proxy_current_rate = $proxy_currency_exchange_rates->where('target_currency_code', $current_currency)->firstOrFail();
 
@@ -501,13 +544,19 @@ final class MoneyConverter implements MoneyConverterInterface
                 self::INTERMEDIATE_ROUNDING
             );
 
-            return ResolvedConversion::fromRate(
+            $resolved = ResolvedConversion::fromRate(
                 $money,
                 $current_target_rate,
                 ConversionStrategy::Proxy,
                 $proxy_target_rate->provider,
                 $this->rounding_mode,
             );
+
+            if (! $this->isProvisionalRate($proxy_target_rate) && ! $this->isProvisionalRate($proxy_current_rate)) {
+                return $resolved;
+            }
+
+            $provisional ??= $resolved;
         } catch (\Throwable $e) {
             Log::debug(self::LOG_PREFIX.' Proxy-currency strategy failed, continuing to next strategy: '.$e->getMessage());
         }
@@ -523,6 +572,12 @@ final class MoneyConverter implements MoneyConverterInterface
             }
         }
 
+        if ($provisional !== null) {
+            Log::info(self::LOG_PREFIX." Using provisional rate ({$provisional->provider}) for {$current_currency}/{$target_currency} on {$date_time->toDateString()}: no daily rate available");
+
+            return $provisional;
+        }
+
         if ($this->options->extrapolate) {
             try {
                 $result = $this->tryExtrapolation($money, $current_currency, $target_currency, $date_time);
@@ -535,6 +590,55 @@ final class MoneyConverter implements MoneyConverterInterface
         }
 
         throw new MoneyConversionException(self::LOG_PREFIX." Unable to find or compute exchange rate for {$current_currency} to {$target_currency} on {$date_time->toDateString()}");
+    }
+
+    /**
+     * The proxy currency's rates for the date: fetched through the provider when allowed and not
+     * already failed in this bulk conversion, otherwise whatever is stored.
+     */
+    private function getProxyHistoricalExchangeRates(string $proxy_currency, CarbonInterface $date_time, bool $canFetch): Collection
+    {
+        if (! $canFetch || $this->historicalFetchFailedEarlier($proxy_currency, $date_time)) {
+            return ExchangeRateRepository::getHistoricalExchangeRates($proxy_currency, $date_time);
+        }
+
+        try {
+            return HistoricalExchangeRate::getHistoricalExchangeRates($proxy_currency, $date_time);
+        } catch (\Throwable $e) {
+            $this->rememberFailedHistoricalFetch($proxy_currency, $date_time);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Whether the date is after today in UTC — the day providers publish rates for.
+     * Compares the date as it is sent to providers (its own `Y-m-d`), not an instant.
+     */
+    private function isFutureDate(CarbonInterface $date_time): bool
+    {
+        return $date_time->format('Y-m-d') > Carbon::now('UTC')->format('Y-m-d');
+    }
+
+    /**
+     * Whether the rate is provisional (a period average). Rates from exchange-rates versions without
+     * provisional rates are never provisional.
+     */
+    private function isProvisionalRate(object $rate): bool
+    {
+        return method_exists($rate, 'isProvisional') && $rate->isProvisional();
+    }
+
+    private function historicalFetchFailedEarlier(string $base_currency, CarbonInterface $date_time): bool
+    {
+        return isset($this->failedHistoricalFetches[$base_currency.'|'.$date_time->format('Y-m-d')]);
+    }
+
+    private function rememberFailedHistoricalFetch(string $base_currency, CarbonInterface $date_time): void
+    {
+        if ($this->failedHistoricalFetches !== null) {
+            $this->failedHistoricalFetches[$base_currency.'|'.$date_time->format('Y-m-d')] = true;
+        }
     }
 
     private function tryInterpolation(Money $money, string $current_currency, string $target_currency, CarbonInterface $date_time, ?Collection $boundingCache = null): ?ResolvedConversion
@@ -589,6 +693,12 @@ final class MoneyConverter implements MoneyConverterInterface
     {
         $previous = ExchangeRateRepository::getPreviousHistoricalRate($current_currency, $target_currency, $date_time);
         $next = ExchangeRateRepository::getNextHistoricalRate($current_currency, $target_currency, $date_time);
+
+        // Like interpolation, ignore a provisional (period-average) side when the other side is a daily
+        // rate: in daily rates the date is then outside the stored range, which is what extrapolation covers.
+        if ($previous && $next && $this->isProvisionalRate($previous) !== $this->isProvisionalRate($next)) {
+            $this->isProvisionalRate($previous) ? $previous = null : $next = null;
+        }
 
         if ($previous && ! $next) {
             $rate = $this->normalizeRate($previous->exchange_rate);

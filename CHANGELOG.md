@@ -12,6 +12,14 @@ See [docs/ENHANCEMENT_PLAN.md](docs/ENHANCEMENT_PLAN.md) for the joint roadmap w
 - Accept `brick/math` `^0.13.0` and `^0.14.0` (Laravel 13 needs `^0.14.2`). Still capped below 1.0, which stops accepting floats.
 - Accept `brightcreations/exchange-rates` `^0.10.0` and `^0.11.0`. Laravel 13 needs exchange-rates `^0.11.0`.
 - CI runs PHP 8.2–8.4 on Laravel 12 and PHP 8.3–8.4 on Laravel 13. `composer.lock` is resolved on PHP 8.2.
+- Fewer provider API calls; conversion results are unchanged:
+  - Historical conversions for a date after today (UTC) no longer try to fetch rates from the provider, directly or for the proxy currency. No provider publishes future rates, so these calls always failed; stored rates, interpolation and extrapolation still apply.
+  - Within one `convertBulk()` / `convertBulkWithResult()` call, a historical fetch that failed for a currency and date is not retried for later items with the same currency and date.
+  - Fresh conversions refresh only the source currency's rates (they read the source → target rate); previously the target currency was fetched too.
+  - Bulk conversions with `needsFresh` refresh each source currency once up front and no longer fetch again for every item.
+- Provisional rates (period averages such as World Bank's yearly rate; exchange-rates with `CurrencyExchangeRateHistory::isProvisional()`) are a last resort in historical conversions: a provisional exact or fetched rate is kept aside while a daily cross-rate and daily interpolation are tried, and is used before extrapolation. A date that already has a provisional rate is not fetched again (exchange-rates' `exchange-rates:refresh-provisional` retries the daily providers). With older exchange-rates versions nothing changes.
+- Extrapolation ignores a provisional neighbour when the other neighbour is a daily rate, matching interpolation, which only uses daily rates as bounds.
+- API-fetched historical conversions now report the provider (exchange-rates sets it on fetched rates; it used to be `null`).
 
 ## [0.12.0] - 2026-07-05
 

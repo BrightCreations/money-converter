@@ -86,7 +86,7 @@ describe('Fresh conversion', function () {
     it('uses bulk store when converting fresh', function () {
         ExchangeRate::shouldReceive('storeBulkExchangeRatesForMultipleCurrencies')
             ->once()
-            ->with(['USD', 'EUR'])
+            ->with(['USD'])
             ->andReturnUsing(function () {
                 $this->seedCurrentRate('USD', 'EUR', 0.85);
 

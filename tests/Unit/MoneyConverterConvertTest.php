@@ -58,7 +58,7 @@ it('applies on_fail only for a single convert call', function () {
 it('fetches fresh rates when convertCurrent is called with fetchOnFail options', function () {
     ExchangeRate::shouldReceive('storeBulkExchangeRatesForMultipleCurrencies')
         ->once()
-        ->with(['USD', 'EUR'])
+        ->with(['USD'])
         ->andReturnUsing(function () {
             $this->seedCurrentRate('USD', 'EUR', 0.85);
 
