@@ -88,12 +88,12 @@ final class MoneyConverter implements MoneyConverterInterface
 
     public function isFetchOnFail(): bool
     {
-        return $this->options->onFail === static::ON_FAIL_FETCH_EXCHANGE_RATES;
+        return $this->options->onFail === self::ON_FAIL_FETCH_EXCHANGE_RATES;
     }
 
     public function isThrowOnFail(): bool
     {
-        return $this->options->onFail === static::ON_FAIL_THROW_EXCEPTION;
+        return $this->options->onFail === self::ON_FAIL_THROW_EXCEPTION;
     }
 
     public function convert(int $money, string $current_currency, string $target_currency, ?CarbonInterface $date_time = null, ?int $on_fail = null, ?MoneyConverterOptions $options = null): int
